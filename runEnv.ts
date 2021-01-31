@@ -7,7 +7,9 @@
 // var ENVIRONMENT_IS_WORKER = typeof importScripts === 'function';
 // var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
 
+const ENVIRONMENT_IS_WEB = typeof window === 'object';
 let ENVIRONMENT_IS_NODE = false;
+let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
 if (typeof process !== 'undefined' && typeof require === 'function') {
     ENVIRONMENT_IS_NODE = process && typeof process === 'object';// Maybe this is Node.js
@@ -46,13 +48,33 @@ if (typeof process !== 'undefined' && typeof require === 'function') {
             ENVIRONMENT_IS_NODE = false;
         }
         // else {
-        //     isNodeJS === true
+        //     ENVIRONMENT_IS_NODE === true
         // }
+    }
+
+    if (ENVIRONMENT_IS_NODE) {
+        try {
+            const {isMainThread} = globalThis["require"]('worker_threads');
+
+            ENVIRONMENT_IS_NODE_MAIN_THREAD = isMainThread;
+        }
+        catch(e) {
+            // old nodejs without Worker's support
+            ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
+        }
     }
 }
 
-const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE && typeof importScripts === 'function' && typeof document === 'undefined';
+const ENVIRONMENT_IS_WEB_WORKER = ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE
+    && typeof globalThis["importScripts"] === 'function'
+    && typeof document === 'undefined'
+;
 
 export const isNodeJS = ENVIRONMENT_IS_NODE;
-export const isWeb = !ENVIRONMENT_IS_NODE;
+export const isNodeJSWorker = !ENVIRONMENT_IS_NODE_MAIN_THREAD;
+export const isWeb = ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE;
 export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER;
+/** isMainThread for browser and nodejs */
+export const isMainThread = ENVIRONMENT_IS_NODE ? ENVIRONMENT_IS_NODE_MAIN_THREAD : !ENVIRONMENT_IS_WEB_WORKER;
+/** isWorkerThread for browser and nodejs */
+export const isWorkerThread = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_THREAD : ENVIRONMENT_IS_WEB_WORKER;
