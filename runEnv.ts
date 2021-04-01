@@ -54,7 +54,10 @@ if (typeof process !== 'undefined' && typeof require === 'function') {
 
     if (ENVIRONMENT_IS_NODE) {
         try {
-            const {isMainThread} = globalThis["require"]('worker_threads');
+            const conditionalNodeRequire = (moduleName: string) => {
+                return require(moduleName);
+            };
+            const {isMainThread} = conditionalNodeRequire('worker_threads');
 
             ENVIRONMENT_IS_NODE_MAIN_THREAD = isMainThread;
         }
