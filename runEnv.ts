@@ -12,9 +12,11 @@ let ENVIRONMENT_IS_NODE = false;
 let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
 if (typeof process !== 'undefined' && typeof require === 'function') {
-    ENVIRONMENT_IS_NODE = process && typeof process === 'object';// Maybe this is Node.js
+    // Don't get fooled by e.g. browserify environments.
+    ENVIRONMENT_IS_NODE = {}.toString.call(process) === "[object process]";
 
     if (ENVIRONMENT_IS_NODE) {
+        // Maybe this is Node.js
         if (typeof window !== 'undefined') {
             if (window["__fake__"]) {
                 // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
@@ -59,7 +61,12 @@ if (typeof process !== 'undefined' && typeof require === 'function') {
             };
             const {isMainThread} = conditionalNodeRequire('worker_threads');
 
-            ENVIRONMENT_IS_NODE_MAIN_THREAD = isMainThread;
+            if (typeof isMainThread === 'boolean') {
+                ENVIRONMENT_IS_NODE_MAIN_THREAD = isMainThread;
+            }
+            else {
+                ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
+            }
         }
         catch(e) {
             // old nodejs without Worker's support
