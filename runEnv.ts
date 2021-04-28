@@ -111,7 +111,7 @@ if (_IS_PROCESS && typeof require === 'function') {
         try {
             const worker_threads = require('worker_threads');
 
-            if (typeof worker_threads["isMainThread"] === 'boolean') {
+            if (worker_threads && typeof worker_threads["isMainThread"] === 'boolean') {
                 ENVIRONMENT_IS_NODE_MAIN_THREAD = worker_threads["isMainThread"];
             }
             else {
