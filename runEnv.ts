@@ -9,6 +9,8 @@
 
 const _IS_PROCESS = typeof process !== 'undefined';
 const _IS_WINDOW = typeof window !== 'undefined';
+const _IS_DOCUMENT = typeof document !== 'undefined';
+const _IS_NAVIGATOR = typeof navigator === 'object';
 
 const ELECTRON__MAIN = 1;
 const ELECTRON__RENDERER = 2;
@@ -39,7 +41,7 @@ function getElectronEnv() {
     }
 
     // Detect the user agent when the `nodeIntegration` option is set to false
-    if (typeof navigator === 'object' && typeof navigator["userAgent"] === 'string' && navigator.userAgent.indexOf('Electron') >= 0) {
+    if (_IS_NAVIGATOR && typeof navigator["userAgent"] === 'string' && navigator.userAgent.indexOf('Electron') >= 0) {
         return ELECTRON__NO_NODE_INTEGRATION;
     }
 
@@ -127,16 +129,26 @@ if (_IS_PROCESS && typeof require === 'function') {
 
 const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
     && typeof globalThis["importScripts"] === 'function'
-    && typeof document === 'undefined'
+    && !_IS_DOCUMENT
 ;
+// Based on https://stackoverflow.com/a/39473604
+// todo: Как выставлять isWeb для ReactNative: в true или в false? Нужно понять, как для ReactNative пишется код и
+//   совместим ли он с кодом для "обычного" Web'а.
+const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT && _IS_NAVIGATOR && navigator.product == 'ReactNative';
+
+// ===========================================================================================
+// -----------============================== exports ==============================-----------
+// ===========================================================================================
 
 /** isMainThread for browser and nodejs */
 export const isMainThread = ENVIRONMENT_IS_NODE ? ENVIRONMENT_IS_NODE_MAIN_THREAD : !ENVIRONMENT_IS_WEB_WORKER;
+
 /** isWorkerThread for browser and nodejs */
 export const isWorkerThread = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_THREAD : ENVIRONMENT_IS_WEB_WORKER;
 
 /** Is this code running in nodejs environment? */
 export const isNodeJS = ENVIRONMENT_IS_NODE;
+
 /**
  * Is this code running in nodejs Worker environment?
  *
@@ -148,6 +160,7 @@ export const isNodeJSWorker = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_T
 
 /** Is this code running in WEB environment? */
 export const isWeb = !ENVIRONMENT_IS_NODE && (ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER);
+
 /**
  * Is this code running in WebWorker environment?
  *
@@ -169,6 +182,7 @@ export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER;
  * * Check node integration by {@link isElectronNodeIntegration}
  **/
 export const isElectron = ENVIRONMENT_IS_ELECTRON;
+
 /**
  * Is this is main Electron process?
  *
@@ -184,6 +198,7 @@ export const isElectron = ENVIRONMENT_IS_ELECTRON;
  * In Chromium, this process is referred to as the "browser process". It is renamed in Electron to avoid confusion with renderer processes.
  **/
 export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
+
 /**
  * Is this is Renderer process of browser Window in Electron app?
  *
@@ -202,6 +217,7 @@ export const isElectronRenderer = ELECTRON_ENV === ELECTRON__RENDERER
     // Determine Electron Renderer process by circumstantial evidence. We assume, if it's WebWorker, it can't be a Renderer process.
     || (ELECTRON_ENV === ELECTRON__NO_NODE_INTEGRATION && !ENVIRONMENT_IS_WEB_WORKER)
 ;
+
 /**
  * Is it Electron process with node integration? One of for `true`:
  * - It's Electron Main process. In this case: {@link isElectronMain} = `true`.
@@ -235,3 +251,5 @@ win.show();
 ```
  */
 export const isElectronNodeIntegration = ENVIRONMENT_IS_ELECTRON && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION;
+
+export const isReactNative = ENVIRONMENT_IS_REACT_NATIVE;
