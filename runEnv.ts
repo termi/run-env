@@ -57,7 +57,11 @@ let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
 if (_IS_PROCESS && typeof require === 'function') {
     // Don't get fooled by e.g. browserify environments.
-    ENVIRONMENT_IS_NODE = {}.toString.call(process) === "[object process]";
+    ENVIRONMENT_IS_NODE = {}.toString.call(process) === "[object process]"
+        // if the checks above will not be enough:
+        // // from https://github.com/realm/realm-js/blob/992392e477cb2f5b059b21f6f04edb5f5e7073c2/packages/realm-network-transport/src/NetworkTransport.ts#L24
+        // && "node" in process.versions
+    ;
 
     if (ENVIRONMENT_IS_NODE) {
         // Maybe this is Node.js
