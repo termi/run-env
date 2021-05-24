@@ -7,6 +7,8 @@
 // var ENVIRONMENT_IS_WORKER = typeof importScripts === 'function';
 // var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
 
+// see also https://github.com/foo123/asynchronous.js/blob/master/asynchronous.js
+
 const _IS_PROCESS = typeof process !== 'undefined';
 const _IS_WINDOW = typeof window !== 'undefined';
 const _IS_DOCUMENT = typeof document !== 'undefined';
@@ -50,21 +52,22 @@ function getElectronEnv() {
 
 const ELECTRON_ENV = getElectronEnv();
 const ENVIRONMENT_IS_ELECTRON = ELECTRON_ENV !== 0;
-const ENVIRONMENT_IS_WEB_WORKER_NODE_INTEGRATION = ELECTRON_ENV === ELECTRON__WEB_WORKER_NODE_INTEGRATION;
-const ENVIRONMENT_IS_WEB_MAIN_PROCESS = typeof window === 'object';
+const ENVIRONMENT_IS_ELECTRON_WEB_WORKER_NODE_INTEGRATION = ELECTRON_ENV === ELECTRON__WEB_WORKER_NODE_INTEGRATION;
+
 let ENVIRONMENT_IS_NODE = false;
 let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
-if (_IS_PROCESS && typeof require === 'function') {
+if (_IS_PROCESS) {
     // Don't get fooled by e.g. browserify environments.
-    ENVIRONMENT_IS_NODE = {}.toString.call(process) === "[object process]"
+    ENVIRONMENT_IS_NODE = Object.prototype.toString.call(process) === "[object process]"
         // if the checks above will not be enough:
+        // && typeof require === 'function'
+        // && Object.prototype.toString.call(globalThis) === "[object global]"
         // // from https://github.com/realm/realm-js/blob/992392e477cb2f5b059b21f6f04edb5f5e7073c2/packages/realm-network-transport/src/NetworkTransport.ts#L24
         // && "node" in process.versions
     ;
 
-    if (ENVIRONMENT_IS_NODE) {
-        // Maybe this is Node.js
+    if (ENVIRONMENT_IS_NODE) {// Maybe this is Node.js
         if (_IS_WINDOW) {
             if (ENVIRONMENT_IS_ELECTRON) {
                 // this is Electron process.
@@ -72,9 +75,8 @@ if (_IS_PROCESS && typeof require === 'function') {
                 //  isNodeJS = false for Renderer or without node integration processes
                 ENVIRONMENT_IS_NODE = ELECTRON_ENV === ELECTRON__MAIN;
             }
-            else if (window["__fake__"]) {
-                // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
-                // workaround for jest+JSDOM
+            else if (!String(window.print).includes('[native code]')) {
+                // This is workaround for jest+JSDOM due jsdom is used automatically (https://github.com/facebook/jest/issues/3692#issuecomment-304945928)
                 ENVIRONMENT_IS_NODE = true;
             }
             else if (window["jasmine"]) {
@@ -91,15 +93,16 @@ if (_IS_PROCESS && typeof require === 'function') {
                     }
                 }
 
-                if (isJasmine) {
-                    ENVIRONMENT_IS_NODE = true;
+                if (!isJasmine) {
+                    // this is something else other than jest/jasmine
+                    ENVIRONMENT_IS_NODE = false;
                 }
             }
             else {
                 ENVIRONMENT_IS_NODE = false;
             }
         }
-        else if (ENVIRONMENT_IS_WEB_WORKER_NODE_INTEGRATION) {
+        else if (ENVIRONMENT_IS_ELECTRON_WEB_WORKER_NODE_INTEGRATION) {
             // this is Electron process.
             //  isNodeJS = false for nodeIntegrationInWorker=true in a web worker
             ENVIRONMENT_IS_NODE = false;
@@ -131,9 +134,16 @@ if (_IS_PROCESS && typeof require === 'function') {
     }
 }
 
+const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE && typeof window === 'object' && globalThis === window;
 const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
     && typeof globalThis["importScripts"] === 'function'
     && !_IS_DOCUMENT
+    && _IS_NAVIGATOR
+    // see node_modules/typescript/lib/lib.webworker.d.ts
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof WorkerNavigator !== 'undefined' && navigator instanceof WorkerNavigator
+    // && typeof globalThis.onmessage !== 'undefined'
 ;
 // Based on https://stackoverflow.com/a/39473604
 // todo: Как выставлять isWeb для ReactNative: в true или в false? Нужно понять, как для ReactNative пишется код и
@@ -153,6 +163,41 @@ export const isWorkerThread = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_TH
 /** Is this code running in nodejs environment? */
 export const isNodeJS = ENVIRONMENT_IS_NODE;
 
+// Also, `process.env.NODE_UNIQUE_ID` will have value for subprocess forked with `cluster` module
+//  https://nodejs.org/api/cluster.html#cluster_cluster_isprimary
+//  cluster.isPrimary: True if the process is a primary. This is determined by the process.env.NODE_UNIQUE_ID. If process.env.NODE_UNIQUE_ID is undefined, then isPrimary is true.
+// Also see https://www.npmjs.com/package/node-ipc
+/**
+ * Node.js process is spawned with an IPC channel (see the [Child Process]{@link https://nodejs.org/api/child_process.html}
+ * and [Cluster]{@link https://nodejs.org/api/cluster.html} documentation).
+ *
+ * Node.js docs about IPC channel and subprocess:
+ *
+ * > When an IPC channel has been established between the parent and child ( i.e. when using [child_process.fork()](https://nodejs.org/api/child_process.html#child_process_child_process_fork_modulepath_args_options)),
+ * > the `subprocess.send()` method can be used to send messages to the child process. When the child process is a
+ * > Node.js instance, these messages can be received via the ['message'](https://nodejs.org/api/process.html#process_event_message)
+ * > event.
+ * >
+ * > Child Node.js processes will have a process.send() method of their own that allows the child to send messages back to the parent.
+ * >
+ * > Accessing the IPC channel fd in any way other than [process.send()](https://nodejs.org/api/process.html#process_process_send_message_sendhandle_options_callback)
+ * > or using the IPC channel with a child process that is not a Node.js instance is not supported.
+ * >
+ * > See example here: [nodejs/docs/child_process/subprocess.send]{@link https://nodejs.org/api/child_process.html#child_process_subprocess_send_message_sendhandle_options_callback}
+ *
+ * Node.js docs about Cluster worker processes:
+ *
+ * > A single instance of Node.js runs in a single thread. To take advantage of multi-core systems, the user will sometimes want to launch a cluster of Node.js processes to handle the load.
+ * >
+ * > The cluster module allows easy creation of child processes that all share server ports.
+ * >
+ * > See example here: [nodejs/docs/cluster/Event:'message']{@link https://nodejs.org/api/cluster.html#cluster_event_message}
+ *
+ * @see `cluster.isPrimary` and `cluster.isWorker` from [nodejs/docs/cluster]{@link https://nodejs.org/api/cluster.html#cluster_cluster_isprimary}
+ * @see `child_process.[fork/spawn] options.stdio` [nodejs/docs/child_process_options_stdio]{@link https://nodejs.org/api/child_process.html#child_process_options_stdio}
+ */
+export const isNodeDependentProcess = ENVIRONMENT_IS_NODE && !!process.send && !!process.disconnect;
+
 /**
  * Is this code running in nodejs Worker environment?
  *
@@ -163,7 +208,15 @@ export const isNodeJS = ENVIRONMENT_IS_NODE;
 export const isNodeJSWorker = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_THREAD;
 
 /** Is this code running in WEB environment? */
-export const isWeb = !ENVIRONMENT_IS_NODE && (ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER);
+export const isWeb = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER;
+
+/**
+ * Is this code running in WEB environment in window opened by `window.open`?
+ *
+ * @see [window.open]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/open}
+ * @see [window.opener]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/opener}
+ */
+export const isWebDependentWindow = ENVIRONMENT_IS_WEB_MAIN_PROCESS && !!window.opener;
 
 /**
  * Is this code running in WebWorker environment?
@@ -173,7 +226,28 @@ export const isWeb = !ENVIRONMENT_IS_NODE && (ENVIRONMENT_IS_WEB_MAIN_PROCESS ||
  * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
  * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
  */
-export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER;
+export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER
+    // see node_modules/typescript/lib/lib.webworker.d.ts
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof WorkerGlobalScope !== 'undefined'
+;
+
+/**
+ * Is this code running in SharedWorker environment?
+ *
+ * If {@link isWebSharedWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
+ *
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ */
+export const isWebSharedWorker = ENVIRONMENT_IS_WEB_WORKER
+    // see node_modules/typescript/lib/lib.webworker.d.ts
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof SharedWorkerGlobalScope !== 'undefined'
+    && typeof globalThis.onconnect !== 'undefined'
+;
 
 /**
  * Is this code running in any Electron environment?
@@ -184,13 +258,15 @@ export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER;
  * * For Renderer process: {@link isElectronRenderer} = `true`
  * * For WebWorker: {@link isWebWorker} = `true`
  * * Check node integration by {@link isElectronNodeIntegration}
+ *
+ * @see [electronjs/docs/process.type]{@link https://www.electronjs.org/docs/api/process#processtype-readonly}
  **/
 export const isElectron = ENVIRONMENT_IS_ELECTRON;
 
 /**
  * Is this is main Electron process?
  *
- * [main process]{@link https://www.electronjs.org/docs/glossary#main-process}
+ * Electron Glossary: [main process]{@link https://www.electronjs.org/docs/glossary#main-process}
  *
  * The main process, commonly a file named `main.js`, is the entry point to every Electron app. It controls the life of
  * the app, from open to close. It also manages native elements such as the Menu, Menu Bar, Dock, Tray, etc. The main
@@ -200,15 +276,19 @@ export const isElectron = ENVIRONMENT_IS_ELECTRON;
  * what file to execute at startup.
  *
  * In Chromium, this process is referred to as the "browser process". It is renamed in Electron to avoid confusion with renderer processes.
+ *
+ * @see [electronjs/docs/Glossary/main process]{@link https://www.electronjs.org/docs/glossary#main-process}
+ * @see [electronjs/docs/Main and Renderer Processes]{@link https://www.electronjs.org/docs/tutorial/quick-start#main-and-renderer-processes}
+ * @see [electronjs/docs/process.isMainFrame]{@link https://www.electronjs.org/docs/api/process#processismainframe-readonly}
  **/
 export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
 
 /**
  * Is this is Renderer process of browser Window in Electron app?
  *
- * Note that it can be Renderer process without node integration: {@link isElectronRenderer} = `true` and {@link isElectronNodeIntegration} = `false`.
+ * Electron Glossary: [renderer process]{@link https://www.electronjs.org/docs/glossary#renderer-process}
  *
- * [renderer process]{@link https://www.electronjs.org/docs/glossary#renderer-process}
+ * Note that it can be Renderer process without node integration: {@link isElectronRenderer} = `true` and {@link isElectronNodeIntegration} = `false`.
  *
  * The renderer process is a browser window in your app. Unlike the main process, there can be multiple of these and
  * each is run in a separate process. They can also be hidden.
@@ -216,6 +296,9 @@ export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
  * In normal browsers, web pages usually run in a sandboxed environment and are not allowed access to native resources.
  * Electron users, however, have the power to use Node.js APIs in web pages allowing lower level operating system
  * interactions.
+ *
+ * @see [electronjs/docs/Glossary/renderer process]{@link https://www.electronjs.org/docs/glossary#renderer-process}
+ * @see [electronjs/docs/Main and Renderer Processes]{@link https://www.electronjs.org/docs/tutorial/quick-start#main-and-renderer-processes}
  **/
 export const isElectronRenderer = ELECTRON_ENV === ELECTRON__RENDERER
     // Determine Electron Renderer process by circumstantial evidence. We assume, if it's WebWorker, it can't be a Renderer process.
@@ -253,6 +336,9 @@ win.loadURL('https://www.html5rocks.com/en/tutorials/workers/basics/');
 win.show();
  // ...running WebWorker on page...
 ```
+ * @see [electronjs/docs/Tag Attributes/nodeintegration]{@link https://www.electronjs.org/docs/api/webview-tag#nodeintegration}
+ * @see [electronjs/docs/Tag Attributes/nodeintegrationinsubframes]{@link https://www.electronjs.org/docs/api/webview-tag#nodeintegrationinsubframes}
+ * @see [electronjs/docs/new BrowserWindow(options: { webPreferences })/nodeIntegration, nodeIntegrationInWorker, nodeIntegrationInSubFrames]{@link https://www.electronjs.org/docs/api/browser-window#new-browserwindowoptions}
  */
 export const isElectronNodeIntegration = ENVIRONMENT_IS_ELECTRON && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION;
 
