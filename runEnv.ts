@@ -118,16 +118,18 @@ if (_IS_PROCESS) {
 
     if (ENVIRONMENT_IS_NODE) {
         try {
-            const worker_threads = require('worker_threads');
+            // (-) `const worker_threads = require('worker_threads');`
+            // Hide require from "rollup", "webpack" and it's friends
+            const worker_threads = (new Function('return req' + 'uire("worker_threads")')());
 
             if (worker_threads && typeof worker_threads["isMainThread"] === 'boolean') {
-                ENVIRONMENT_IS_NODE_MAIN_THREAD = worker_threads["isMainThread"];
+                ENVIRONMENT_IS_NODE_MAIN_THREAD = (worker_threads as typeof import("worker_threads")).isMainThread;
             }
             else {
                 ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
             }
         }
-        catch(e) {
+        catch {
             // old nodejs without Worker's support
             ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
         }
@@ -136,13 +138,15 @@ if (_IS_PROCESS) {
 
 const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE && typeof window === 'object' && globalThis === window;
 const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
-    && typeof globalThis["importScripts"] === 'function'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */globalThis).importScripts === 'function'
     && !_IS_DOCUMENT
     && _IS_NAVIGATOR
+    // Can't <reference lib="webworker" /> due error like:
+    // `TS2403: Subsequent variable declarations must have the same type. Variable 'location' must be of type 'Location', but here has type 'WorkerLocation'.  lib.dom.d.ts(19615, 13): 'location' was also declared here.`
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    && typeof WorkerNavigator !== 'undefined' && navigator instanceof WorkerNavigator
+    && typeof WorkerNavigator !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").WorkerNavigator} */navigator) instanceof WorkerNavigator
     // && typeof globalThis.onmessage !== 'undefined'
 ;
 // Based on https://stackoverflow.com/a/39473604
@@ -154,13 +158,30 @@ const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT && _IS_NAVIGATOR && navigator.
 // -----------============================== exports ==============================-----------
 // ===========================================================================================
 
-/** isMainThread for browser and nodejs */
+/**
+ * isMainThread for browser and nodejs
+ *
+ * @see {@link isNodeJSWorker}
+ * @see {@link isWebWorker}
+ */
 export const isMainThread = ENVIRONMENT_IS_NODE ? ENVIRONMENT_IS_NODE_MAIN_THREAD : !ENVIRONMENT_IS_WEB_WORKER;
 
-/** isWorkerThread for browser and nodejs */
+/**
+ * isWorkerThread for browser and nodejs
+ *
+ * @see {@link isNodeJSWorker}
+ * @see {@link isWebWorker}
+ */
 export const isWorkerThread = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_THREAD : ENVIRONMENT_IS_WEB_WORKER;
 
-/** Is this code running in nodejs environment? */
+// -----------============================== NodeJS details ==============================-----------
+
+/**
+ * Is this code running in nodejs environment?
+ *
+ * @see {@link isNodeDependentProcess}
+ * @see {@link isNodeJSWorker}
+ */
 export const isNodeJS = ENVIRONMENT_IS_NODE;
 
 // Also, `process.env.NODE_UNIQUE_ID` will have value for subprocess forked with `cluster` module
@@ -207,7 +228,14 @@ export const isNodeDependentProcess = ENVIRONMENT_IS_NODE && !!process.send && !
  */
 export const isNodeJSWorker = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_THREAD;
 
-/** Is this code running in WEB environment? */
+// -----------============================== Web details ==============================-----------
+
+/**
+ * Is this code running in WEB environment?
+ *
+ * @see {@link isWebDedicatedWorker}
+ * @see {@link isWebWorker}
+ */
 export const isWeb = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER;
 
 /**
@@ -223,8 +251,12 @@ export const isWebDependentWindow = ENVIRONMENT_IS_WEB_MAIN_PROCESS && !!window.
  *
  * If {@link isWebWorker} = `true`, {@link isWeb} always will be `true`.
  *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ * @see {@link isWebDedicatedWorker}
+ * @see {@link isWebSharedWorker}
+ * @see {@link isWebServiceWorker}
+ * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
+ * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ * @see [Live WebWorker Example]{@link https://mdn.github.io/simple-web-worker/}
  */
 export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
@@ -234,20 +266,62 @@ export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER
 ;
 
 /**
+ * Is this code running in DedicatedWorker environment?
+ *
+ * If {@link isWebDedicatedWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
+ *
+ * @see {@link isWebWorker}
+ * @see [MDN / DedicatedWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorker}
+ * @see [MDN / DedicatedWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope}
+ * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
+ * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ */
+export const isWebDedicatedWorker = ENVIRONMENT_IS_WEB_WORKER
+    // see node_modules/typescript/lib/lib.webworker.d.ts
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof DedicatedWorkerGlobalScope !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").DedicatedWorkerGlobalScope} */globalThis) instanceof DedicatedWorkerGlobalScope
+;
+
+/**
  * Is this code running in SharedWorker environment?
  *
  * If {@link isWebSharedWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
  *
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
- * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ * @see {@link isWebWorker}
+ * @see [MDN / SharedWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/SharedWorker}
+ * @see [MDN / SharedWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/SharedWorkerGlobalScope}
+ * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
+ * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ * @see {@link ../node_modules/typescript/lib/lib.webworker.d.ts}
  */
 export const isWebSharedWorker = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     && typeof SharedWorkerGlobalScope !== 'undefined'
-    && typeof globalThis.onconnect !== 'undefined'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").SharedWorkerGlobalScope} */globalThis).onconnect !== 'undefined'
 ;
+
+/**
+ * Is this code running in ServiceWorker environment?
+ *
+ * If {@link isWebServiceWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
+ *
+ * @see {@link isWebWorker}
+ * @see [MDN / ServiceWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorker}
+ * @see [MDN / ServiceWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope}
+ * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
+ * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ */
+export const isWebServiceWorker = ENVIRONMENT_IS_WEB_WORKER
+    // see node_modules/typescript/lib/lib.webworker.d.ts
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof ServiceWorkerGlobalScope !== 'undefined'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis).skipWaiting === 'function'
+;
+
 
 /**
  * Is this code running in any Electron environment?
@@ -259,6 +333,9 @@ export const isWebSharedWorker = ENVIRONMENT_IS_WEB_WORKER
  * * For WebWorker: {@link isWebWorker} = `true`
  * * Check node integration by {@link isElectronNodeIntegration}
  *
+ * @see {@link isElectronMain}
+ * @see {@link isElectronRenderer}
+ * @see {@link isElectronNodeIntegration}
  * @see [electronjs/docs/process.type]{@link https://www.electronjs.org/docs/api/process#processtype-readonly}
  **/
 export const isElectron = ENVIRONMENT_IS_ELECTRON;
@@ -341,5 +418,7 @@ win.show();
  * @see [electronjs/docs/new BrowserWindow(options: { webPreferences })/nodeIntegration, nodeIntegrationInWorker, nodeIntegrationInSubFrames]{@link https://www.electronjs.org/docs/api/browser-window#new-browserwindowoptions}
  */
 export const isElectronNodeIntegration = ENVIRONMENT_IS_ELECTRON && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION;
+
+// -----------============================== ReactNative details ==============================-----------
 
 export const isReactNative = ENVIRONMENT_IS_REACT_NATIVE;
