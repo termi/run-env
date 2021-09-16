@@ -217,7 +217,10 @@ export const isNodeJS = ENVIRONMENT_IS_NODE;
  * @see `cluster.isPrimary` and `cluster.isWorker` from [nodejs/docs/cluster]{@link https://nodejs.org/api/cluster.html#cluster_cluster_isprimary}
  * @see `child_process.[fork/spawn] options.stdio` [nodejs/docs/child_process_options_stdio]{@link https://nodejs.org/api/child_process.html#child_process_options_stdio}
  */
-export const isNodeDependentProcess = ENVIRONMENT_IS_NODE && !!process.send && !!process.disconnect;
+export const isNodeJSDependentProcess = ENVIRONMENT_IS_NODE
+    && !!process.send
+    && !!process.disconnect
+;
 
 /**
  * Is this code running in nodejs Worker environment?
@@ -280,7 +283,10 @@ export const isWebDedicatedWorker = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    && typeof DedicatedWorkerGlobalScope !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").DedicatedWorkerGlobalScope} */globalThis) instanceof DedicatedWorkerGlobalScope
+    && typeof DedicatedWorkerGlobalScope !== 'undefined'
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && (/** @type {import("typescript/lib/lib.webworker").DedicatedWorkerGlobalScope} */globalThis) instanceof DedicatedWorkerGlobalScope
 ;
 
 /**
