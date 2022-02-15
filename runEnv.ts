@@ -138,7 +138,7 @@ if (_IS_PROCESS) {
 
 const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE && typeof window === 'object' && globalThis === window;
 const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
-    && typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */globalThis).importScripts === 'function'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */globalThis)["importScripts"] === 'function'
     && !_IS_DOCUMENT
     && _IS_NAVIGATOR
     // Can't <reference lib="webworker" /> due error like:
@@ -306,7 +306,7 @@ export const isWebSharedWorker = ENVIRONMENT_IS_WEB_WORKER
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     && typeof SharedWorkerGlobalScope !== 'undefined'
-    && typeof (/** @type {import("typescript/lib/lib.webworker").SharedWorkerGlobalScope} */globalThis).onconnect !== 'undefined'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").SharedWorkerGlobalScope} */globalThis)["onconnect"] !== 'undefined'
 ;
 
 /**
@@ -325,7 +325,7 @@ export const isWebServiceWorker = ENVIRONMENT_IS_WEB_WORKER
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     && typeof ServiceWorkerGlobalScope !== 'undefined'
-    && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis).skipWaiting === 'function'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis)["skipWaiting"] === 'function'
 ;
 
 
