@@ -159,30 +159,30 @@ const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT && _IS_NAVIGATOR && navigator.
 // ===========================================================================================
 
 /**
- * isMainThread for browser and nodejs
+ * isMainThread for browser and nodejs. `true` if negative {@link isNodeJSWorker} or {@link isWebWorker}.
  *
  * @see {@link isNodeJSWorker}
  * @see {@link isWebWorker}
  */
-export const isMainThread = ENVIRONMENT_IS_NODE ? ENVIRONMENT_IS_NODE_MAIN_THREAD : !ENVIRONMENT_IS_WEB_WORKER;
+export const isMainThread: boolean = ENVIRONMENT_IS_NODE ? ENVIRONMENT_IS_NODE_MAIN_THREAD : !ENVIRONMENT_IS_WEB_WORKER;
 
 /**
- * isWorkerThread for browser and nodejs
+ * isWorkerThread for browser and nodejs. `true` if positive {@link isNodeJSWorker} or {@link isWebWorker}.
  *
  * @see {@link isNodeJSWorker}
  * @see {@link isWebWorker}
  */
-export const isWorkerThread = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_THREAD : ENVIRONMENT_IS_WEB_WORKER;
+export const isWorkerThread: boolean = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_THREAD : ENVIRONMENT_IS_WEB_WORKER;
 
 // -----------============================== NodeJS details ==============================-----------
 
 /**
  * Is this code running in nodejs environment?
  *
- * @see {@link isNodeDependentProcess}
+ * @see {@link isNodeJSDependentProcess}
  * @see {@link isNodeJSWorker}
  */
-export const isNodeJS = ENVIRONMENT_IS_NODE;
+export const isNodeJS: boolean = ENVIRONMENT_IS_NODE;
 
 // Also, `process.env.NODE_UNIQUE_ID` will have value for subprocess forked with `cluster` module
 //  https://nodejs.org/api/cluster.html#cluster_cluster_isprimary
@@ -217,7 +217,7 @@ export const isNodeJS = ENVIRONMENT_IS_NODE;
  * @see `cluster.isPrimary` and `cluster.isWorker` from [nodejs/docs/cluster]{@link https://nodejs.org/api/cluster.html#cluster_cluster_isprimary}
  * @see `child_process.[fork/spawn] options.stdio` [nodejs/docs/child_process_options_stdio]{@link https://nodejs.org/api/child_process.html#child_process_options_stdio}
  */
-export const isNodeJSDependentProcess = ENVIRONMENT_IS_NODE
+export const isNodeJSDependentProcess: boolean = ENVIRONMENT_IS_NODE
     && !!process.send
     && !!process.disconnect
 ;
@@ -229,17 +229,20 @@ export const isNodeJSDependentProcess = ENVIRONMENT_IS_NODE
  *
  * @see {@link https://nodejs.org/api/worker_threads.html#worker_threads_class_worker}
  */
-export const isNodeJSWorker = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_THREAD;
+export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_THREAD;
 
 // -----------============================== Web details ==============================-----------
 
 /**
  * Is this code running in WEB environment?
  *
- * @see {@link isWebDedicatedWorker}
+ * @see {@link isWebDependentWindow}
  * @see {@link isWebWorker}
+ * @see {@link isWebDedicatedWorker}
+ * @see {@link isWebSharedWorker}
+ * @see {@link isWebServiceWorker}
  */
-export const isWeb = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER;
+export const isWeb: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER;
 
 /**
  * Is this code running in WEB environment in window opened by `window.open`?
@@ -247,7 +250,9 @@ export const isWeb = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKE
  * @see [window.open]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/open}
  * @see [window.opener]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/opener}
  */
-export const isWebDependentWindow = ENVIRONMENT_IS_WEB_MAIN_PROCESS && !!window.opener;
+export const isWebDependentWindow: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS
+    && !!window.opener
+;
 
 /**
  * Is this code running in WebWorker environment?
@@ -261,7 +266,7 @@ export const isWebDependentWindow = ENVIRONMENT_IS_WEB_MAIN_PROCESS && !!window.
  * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
  * @see [Live WebWorker Example]{@link https://mdn.github.io/simple-web-worker/}
  */
-export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER
+export const isWebWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -279,7 +284,7 @@ export const isWebWorker = ENVIRONMENT_IS_WEB_WORKER
  * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
  * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
  */
-export const isWebDedicatedWorker = ENVIRONMENT_IS_WEB_WORKER
+export const isWebDedicatedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -301,7 +306,7 @@ export const isWebDedicatedWorker = ENVIRONMENT_IS_WEB_WORKER
  * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
  * @see {@link ../node_modules/typescript/lib/lib.webworker.d.ts}
  */
-export const isWebSharedWorker = ENVIRONMENT_IS_WEB_WORKER
+export const isWebSharedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -320,7 +325,7 @@ export const isWebSharedWorker = ENVIRONMENT_IS_WEB_WORKER
  * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
  * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
  */
-export const isWebServiceWorker = ENVIRONMENT_IS_WEB_WORKER
+export const isWebServiceWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
@@ -328,6 +333,36 @@ export const isWebServiceWorker = ENVIRONMENT_IS_WEB_WORKER
     && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis)["skipWaiting"] === 'function'
 ;
 
+// -----------============================== Cordova details ==============================-----------
+
+/**
+ * Is this code running in any Cordova environment?
+ *
+ * @see {@link https://cordova.apache.org/docs/en/latest/}
+ */
+export const isCordova =
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    typeof cordova === "object"
+;
+
+/*
+// -----------============================== NW.js details ==============================-----------
+
+// https://nwjs.io/
+export const isNwjsMainProcess = ENVIRONMENT_IS_NODE
+    && (function() {
+        try {
+            return typeof require('nw.gui') !== 'undefined';
+        }
+        catch (e) {
+            return false;
+        }
+    })()
+;
+*/
+
+// -----------============================== Electron details ==============================-----------
 
 /**
  * Is this code running in any Electron environment?
@@ -344,7 +379,7 @@ export const isWebServiceWorker = ENVIRONMENT_IS_WEB_WORKER
  * @see {@link isElectronNodeIntegration}
  * @see [electronjs/docs/process.type]{@link https://www.electronjs.org/docs/api/process#processtype-readonly}
  **/
-export const isElectron = ENVIRONMENT_IS_ELECTRON;
+export const isElectron: boolean = ENVIRONMENT_IS_ELECTRON;
 
 /**
  * Is this is main Electron process?
@@ -383,7 +418,7 @@ export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
  * @see [electronjs/docs/Glossary/renderer process]{@link https://www.electronjs.org/docs/glossary#renderer-process}
  * @see [electronjs/docs/Main and Renderer Processes]{@link https://www.electronjs.org/docs/tutorial/quick-start#main-and-renderer-processes}
  **/
-export const isElectronRenderer = ELECTRON_ENV === ELECTRON__RENDERER
+export const isElectronRenderer: boolean = ELECTRON_ENV === ELECTRON__RENDERER
     // Determine Electron Renderer process by circumstantial evidence. We assume, if it's WebWorker, it can't be a Renderer process.
     || (ELECTRON_ENV === ELECTRON__NO_NODE_INTEGRATION && !ENVIRONMENT_IS_WEB_WORKER)
 ;
@@ -423,8 +458,10 @@ win.show();
  * @see [electronjs/docs/Tag Attributes/nodeintegrationinsubframes]{@link https://www.electronjs.org/docs/api/webview-tag#nodeintegrationinsubframes}
  * @see [electronjs/docs/new BrowserWindow(options: { webPreferences })/nodeIntegration, nodeIntegrationInWorker, nodeIntegrationInSubFrames]{@link https://www.electronjs.org/docs/api/browser-window#new-browserwindowoptions}
  */
-export const isElectronNodeIntegration = ENVIRONMENT_IS_ELECTRON && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION;
+export const isElectronNodeIntegration: boolean = ENVIRONMENT_IS_ELECTRON
+    && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION
+;
 
 // -----------============================== ReactNative details ==============================-----------
 
-export const isReactNative = ENVIRONMENT_IS_REACT_NATIVE;
+export const isReactNative: boolean = ENVIRONMENT_IS_REACT_NATIVE;
