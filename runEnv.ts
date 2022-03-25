@@ -8,6 +8,7 @@
 // var ENVIRONMENT_IS_SHELL = !ENVIRONMENT_IS_WEB && !ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_WORKER;
 
 // see also https://github.com/foo123/asynchronous.js/blob/master/asynchronous.js
+// see also https://github.com/iliakan/detect-node
 
 const _IS_PROCESS = typeof process !== 'undefined';
 const _IS_WINDOW = typeof window !== 'undefined';
@@ -59,6 +60,7 @@ let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
 if (_IS_PROCESS) {
     // Don't get fooled by e.g. browserify environments.
+    // Only Node.JS has a process variable that is of [[Class]] process
     ENVIRONMENT_IS_NODE = Object.prototype.toString.call(process) === "[object process]"
         // if the checks above will not be enough:
         // && typeof require === 'function'
