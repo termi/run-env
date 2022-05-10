@@ -14,30 +14,32 @@ const _IS_PROCESS = typeof process !== 'undefined';
 const _IS_WINDOW = typeof window !== 'undefined';
 const _IS_DOCUMENT = typeof document !== 'undefined';
 const _IS_NAVIGATOR = typeof navigator === 'object';
+const _toString = Object.prototype.toString;
 
 const ELECTRON__MAIN = 1;
-const ELECTRON__RENDERER = 2;
+const ELECTRON__RENDERER_WITH_NODE_INTEGRATION = 2;
 const ELECTRON__NO_NODE_INTEGRATION = 3;
 const ELECTRON__WEB_WORKER_NODE_INTEGRATION = 4;
 
 // https://github.com/electron/electron/issues/2288
+// see also: https://github.com/cheton/is-electron/
 function getElectronEnv() {
     // Renderer process
-    // en: https://www.electronjs.org/docs/api/process#processtype-readonly
-    // ru: https://www.electronjs.org/docs/api/process#processtype-%D1%82%D0%BE%D0%BB%D1%8C%D0%BA%D0%BE-%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D0%B5
+    // en: https://www.electronjs.org/docs/latest/api/process#processtype-readonly
+    // ru: https://www.electronjs.org/ru/docs/latest/api/process#processtype-%D1%82%D0%BE%D0%BB%D1%8C%D0%BA%D0%BE-%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D0%B5
     // process.type: A String representing the current process's type, can be:
     // * browser - The main process
     // * renderer - A renderer process
     // * worker - In a web worker
-    if (_IS_WINDOW && typeof window.process === 'object' && window.process["type"] === 'renderer') {
-        return ELECTRON__RENDERER;
+    if (_IS_WINDOW && typeof window.process === 'object' && !!window.process && window.process["type"] === 'renderer') {
+        return ELECTRON__RENDERER_WITH_NODE_INTEGRATION;
     }
 
     // Main process
     if (_IS_PROCESS && typeof process.versions === 'object' && !!process.versions.electron) {
         // For
         // ```
-        // const win = new BrowserWindow({ webPreferences: { nodeIntegrationInWorker: true } });
+        // const win = new BrowserWindow({ webPreferences: { nodeIntegrationInWorker: true, contextIsolation: false } });
         // ```
         // process.type should be 'worker'
         return process["type"] === 'worker' ? ELECTRON__WEB_WORKER_NODE_INTEGRATION : ELECTRON__MAIN;
@@ -61,7 +63,7 @@ let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 if (_IS_PROCESS) {
     // Don't get fooled by e.g. browserify environments.
     // Only Node.JS has a process variable that is of [[Class]] process
-    ENVIRONMENT_IS_NODE = Object.prototype.toString.call(process) === "[object process]"
+    ENVIRONMENT_IS_NODE = _toString.call(process) === "[object process]"
         // if the checks above will not be enough:
         // && typeof require === 'function'
         // && Object.prototype.toString.call(globalThis) === "[object global]"
@@ -138,10 +140,15 @@ if (_IS_PROCESS) {
     }
 }
 
-const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE && typeof window === 'object' && globalThis === window;
 const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
+    // && typeof globalThis.onmessage !== 'undefined'
+    // see node_modules/typescript/lib/lib.webworker.d.ts
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof WorkerGlobalScope !== 'undefined'
     && typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */globalThis)["importScripts"] === 'function'
     && !_IS_DOCUMENT
+    && !_IS_WINDOW
     && _IS_NAVIGATOR
     // Can't <reference lib="webworker" /> due error like:
     // `TS2403: Subsequent variable declarations must have the same type. Variable 'location' must be of type 'Location', but here has type 'WorkerLocation'.  lib.dom.d.ts(19615, 13): 'location' was also declared here.`
@@ -149,42 +156,79 @@ const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     && typeof WorkerNavigator !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").WorkerNavigator} */navigator) instanceof WorkerNavigator
-    // && typeof globalThis.onmessage !== 'undefined'
+;
+const ENVIRONMENT_IS_WEB_WORKLED = !ENVIRONMENT_IS_NODE
+    && typeof (globalThis["WorkletGlobalScope"]) !== 'undefined'
+;
+const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE
+    && typeof window !== 'undefined'
+    && globalThis === window
+    && !ENVIRONMENT_IS_WEB_WORKLED
+    && !ENVIRONMENT_IS_WEB_WORKER
+    /*
+    In Electon Renderer process (Web Window) with { nodeIntegration: true, contextIsolation: false }: `Object.prototype.toString.call(window) === '[object global]'`.
+    Also see: https://www.electronjs.org/docs/latest/api/process#processcontextisolated-readonly
+    */
+    && ((ELECTRON_ENV === ELECTRON__RENDERER_WITH_NODE_INTEGRATION && _IS_PROCESS && process["contextIsolated"] === false)
+        ? _toString.call(window) === '[object global]'
+        : _toString.call(window) === '[object Window]'
+    )
 ;
 // Based on https://stackoverflow.com/a/39473604
 // todo: Как выставлять isWeb для ReactNative: в true или в false? Нужно понять, как для ReactNative пишется код и
 //   совместим ли он с кодом для "обычного" Web'а.
 const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT && _IS_NAVIGATOR && navigator.product == 'ReactNative';
 
+const ENVIRONMENT_IS_MAIN_THREAD = ENVIRONMENT_IS_NODE
+    ? ENVIRONMENT_IS_NODE_MAIN_THREAD
+    : ((!ENVIRONMENT_IS_WEB_WORKER && !ENVIRONMENT_IS_WEB_WORKLED) && ENVIRONMENT_IS_WEB_MAIN_PROCESS)
+;
+const ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD = ENVIRONMENT_IS_NODE
+    ? !ENVIRONMENT_IS_NODE_MAIN_THREAD
+    : (ENVIRONMENT_IS_WEB_WORKER || ENVIRONMENT_IS_WEB_WORKLED)
+;
+const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER || ENVIRONMENT_IS_WEB_WORKLED;
+
 // ===========================================================================================
 // -----------============================== exports ==============================-----------
 // ===========================================================================================
 
 /**
- * isMainThread for browser and nodejs. `true` if negative {@link isNodeJSWorker} or {@link isWebWorker}.
+ * Is this code running in nodejs **non-Worker** environment? For browser and nodejs.
  *
- * @see {@link isNodeJSWorker}
- * @see {@link isWebWorker}
+ * `true` if negative {@link isNodeJSWorker} and {@link isWebWorker}, and {@link isWebWorklet}.
+ *
+ * @see {@link isNodeJSMainThread}
+ * @see {@link isWebMainThread}
  */
-export const isMainThread: boolean = ENVIRONMENT_IS_NODE ? ENVIRONMENT_IS_NODE_MAIN_THREAD : !ENVIRONMENT_IS_WEB_WORKER;
+export const isMainThread: boolean = ENVIRONMENT_IS_MAIN_THREAD;
 
 /**
- * isWorkerThread for browser and nodejs. `true` if positive {@link isNodeJSWorker} or {@link isWebWorker}.
+ * Is this code running in nodejs **Worker** environment? For browser (worker and worklet) and nodejs (worker).
  *
- * @see {@link isNodeJSWorker}
- * @see {@link isWebWorker}
+ * `true` if positive {@link isNodeJSWorker} or {@link isWebWorker}, or {@link isWebWorklet}.
+ *
+ * {@link isNodeJSMainThread} and {@link isWebMainThread} will be `false`.
  */
-export const isWorkerThread: boolean = ENVIRONMENT_IS_NODE ? !ENVIRONMENT_IS_NODE_MAIN_THREAD : ENVIRONMENT_IS_WEB_WORKER;
+export const isWorkerThread: boolean = ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD;
 
 // -----------============================== NodeJS details ==============================-----------
 
 /**
  * Is this code running in nodejs environment?
  *
+ * @see {@link isNodeJSMainThread}
  * @see {@link isNodeJSDependentProcess}
  * @see {@link isNodeJSWorker}
  */
 export const isNodeJS: boolean = ENVIRONMENT_IS_NODE;
+
+/**
+ * Is this code running in nodejs **non-Worker** environment?
+ *
+ * If `true`, {@link isNodeJS} will be `true` and {@link isNodeJSWorker} will be `false`.
+ */
+export const isNodeJSMainThread: boolean = ENVIRONMENT_IS_NODE && ENVIRONMENT_IS_NODE_MAIN_THREAD;
 
 // Also, `process.env.NODE_UNIQUE_ID` will have value for subprocess forked with `cluster` module
 //  https://nodejs.org/api/cluster.html#cluster_cluster_isprimary
@@ -218,6 +262,8 @@ export const isNodeJS: boolean = ENVIRONMENT_IS_NODE;
  *
  * @see `cluster.isPrimary` and `cluster.isWorker` from [nodejs/docs/cluster]{@link https://nodejs.org/api/cluster.html#cluster_cluster_isprimary}
  * @see `child_process.[fork/spawn] options.stdio` [nodejs/docs/child_process_options_stdio]{@link https://nodejs.org/api/child_process.html#child_process_options_stdio}
+ * @see {@link isNodeJS}
+ * @see {@link isNodeJSMainThread}
  */
 export const isNodeJSDependentProcess: boolean = ENVIRONMENT_IS_NODE
     && !!process.send
@@ -225,9 +271,9 @@ export const isNodeJSDependentProcess: boolean = ENVIRONMENT_IS_NODE
 ;
 
 /**
- * Is this code running in nodejs Worker environment?
+ * Is this code running in nodejs **Worker** environment?
  *
- * If {@link isNodeJSWorker} = `true`, {@link isNodeJS} always will be `true`.
+ * If `true`, {@link isNodeJS} will be `true`, {@link isNodeJSMainThread} will be `false`.
  *
  * @see {@link https://nodejs.org/api/worker_threads.html#worker_threads_class_worker}
  */
@@ -236,30 +282,42 @@ export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NO
 // -----------============================== Web details ==============================-----------
 
 /**
- * Is this code running in WEB environment?
+ * Is this code running in **WEB** environment?
  *
  * @see {@link isWebDependentWindow}
  * @see {@link isWebWorker}
+ * @see {@link isWebWorklet}
  * @see {@link isWebDedicatedWorker}
  * @see {@link isWebSharedWorker}
  * @see {@link isWebServiceWorker}
  */
-export const isWeb: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER;
+export const isWeb: boolean = ENVIRONMENT_IS_WEB;
 
 /**
- * Is this code running in WEB environment in window opened by `window.open`?
+ * Is this code running in **WEB** environment and it is a **common web Window** process (**non-Worker** environment)?
  *
+ * `true` if positive {@link isWeb}, and negative {@link isWebWorker} and {@link isWebWorklet}.
+ *
+ * @see {@link isWebDependentWindow}
+ */
+export const isWebMainThread: boolean = ENVIRONMENT_IS_WEB && ENVIRONMENT_IS_MAIN_THREAD;
+
+/**
+ * Is this code running in main **WEB** environment in window opened by `window.open` (**dependent window** environment)?
+ *
+ * @see {@link isWeb}
+ * @see {@link isWebMainThread}
  * @see [window.open]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/open}
  * @see [window.opener]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/opener}
  */
-export const isWebDependentWindow: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS
+export const isWebDependentWindow: boolean = ENVIRONMENT_IS_WEB && ENVIRONMENT_IS_MAIN_THREAD
     && !!window.opener
 ;
 
 /**
- * Is this code running in WebWorker environment?
+ * Is this code running in **Web Worker** environment?
  *
- * If {@link isWebWorker} = `true`, {@link isWeb} always will be `true`.
+ * If `true`, {@link isWeb} will be `true`.
  *
  * @see {@link isWebDedicatedWorker}
  * @see {@link isWebSharedWorker}
@@ -268,19 +326,13 @@ export const isWebDependentWindow: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS
  * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
  * @see [Live WebWorker Example]{@link https://mdn.github.io/simple-web-worker/}
  */
-export const isWebWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
-    // see node_modules/typescript/lib/lib.webworker.d.ts
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    && typeof WorkerGlobalScope !== 'undefined'
-;
+export const isWebWorker: boolean = ENVIRONMENT_IS_WEB_WORKER;
 
 /**
- * Is this code running in DedicatedWorker environment?
+ * Is this code running in **DedicatedWorker** environment?
  *
- * If {@link isWebDedicatedWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
+ * If `true`,  {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
  *
- * @see {@link isWebWorker}
  * @see [MDN / DedicatedWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorker}
  * @see [MDN / DedicatedWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope}
  * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
@@ -297,11 +349,10 @@ export const isWebDedicatedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
 ;
 
 /**
- * Is this code running in SharedWorker environment?
+ * Is this code running in **SharedWorker** environment?
  *
- * If {@link isWebSharedWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
+ * If `true`,  {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
  *
- * @see {@link isWebWorker}
  * @see [MDN / SharedWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/SharedWorker}
  * @see [MDN / SharedWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/SharedWorkerGlobalScope}
  * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
@@ -317,11 +368,10 @@ export const isWebSharedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
 ;
 
 /**
- * Is this code running in ServiceWorker environment?
+ * Is this code running in **ServiceWorker** environment?
  *
- * If {@link isWebServiceWorker} = `true`,  {@link isWebWorker} always will be `true` and {@link isWeb} always will be `true`.
+ * If `true`,  {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
  *
- * @see {@link isWebWorker}
  * @see [MDN / ServiceWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorker}
  * @see [MDN / ServiceWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope}
  * @see [MDN / Web Workers API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API}
@@ -334,6 +384,71 @@ export const isWebServiceWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     && typeof ServiceWorkerGlobalScope !== 'undefined'
     && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis)["skipWaiting"] === 'function'
 ;
+
+// -----------============================== Web Worklet's details ==============================-----------
+
+/**
+ * Is this code running in **Web Worklet** environment?
+ *
+ * If {@link isWebWorklet} = `true`, {@link isWeb} always will be `true`.
+ *
+ * @see {@link isWebPaintWorklet}
+ * @see {@link isWebAudioWorklet}
+ * @see [MDN / Worklet]{@link https://developer.mozilla.org/en-US/docs/Web/API/Worklet}
+ * @see [whatwg / HTML spec / Worklets]{@link https://html.spec.whatwg.org/multipage/worklets.html}
+ * @see [MDN / Using web workers]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers}
+ * @see [Live WebWorker Example]{@link https://mdn.github.io/simple-web-worker/}
+ * @see [HTML Living Standard / WorkletGlobalScope]{@link https://html.spec.whatwg.org/multipage/worklets.html#workletglobalscope}
+ */
+export const isWebWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED;
+
+/**
+ * Is this code running in **PaintWorklet** environment?
+ *
+ * If {@link isWebAudioWorklet} = `true`,  {@link isWebWorklet} always will be `true` and {@link isWeb} always will be `true`.
+ *
+ * @see {@link isWebWorklet}
+ * @see [MDN / PaintWorklet]{@link https://developer.mozilla.org/en-US/docs/Web/API/PaintWorklet}
+ * @see [MDN / PaintWorkletGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/PaintWorkletGlobalScope}
+ * @see [MDN / CSS Painting API]{@link https://developer.mozilla.org/en-US/docs/Web/API/CSS_Painting_API}
+ * @see [MDN / Using the CSS Painting API]{@link https://developer.mozilla.org/en-US/docs/Web/API/CSS_Painting_API/Guide}
+ * @see [CSS Painting API Level 1 / Paint Worklet]{@link https://www.w3.org/TR/css-paint-api-1/#paint-worklet}
+ */
+export const isWebPaintWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof PaintWorkletGlobalScope !== 'undefined'
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof (globalThis as PaintWorkletGlobalScope).registerPaint === 'function'
+;
+
+/**
+ * Is this code running in **AudioWorklet** environment?
+ *
+ * If {@link isWebAudioWorklet} = `true`,  {@link isWebWorklet} always will be `true` and {@link isWeb} always will be `true`.
+ *
+ * @see {@link isWebWorklet}
+ * @see [MDN / AudioWorklet]{@link https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet}
+ * @see [MDN / AudioWorkletGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletGlobalScope}
+ * @see [MDN / Web Audio API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API}
+ * @see [MDN / Using the Web Audio API]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Using_Web_Audio_API}
+ * @see [MDN / Background audio processing using AudioWorklet]{@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API/Using_AudioWorklet}
+ * @see [Web Audio API / The AudioWorklet Interface]{@link https://www.w3.org/TR/webaudio/#AudioWorklet}
+ * @see [Audio Worklet Examples]{@link https://googlechromelabs.github.io/web-audio-samples/audio-worklet/}
+ */
+export const isWebAudioWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof AudioWorkletGlobalScope !== 'undefined'
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    && typeof (globalThis as AudioWorkletGlobalScope).registerProcessor === 'function'
+;
+
+// todo:
+//  - AnimationWorklet: https://wicg.github.io/animation-worklet/
+//  - LayoutWorklet: https://drafts.css-houdini.org/css-layout-api-1/#layout-worklet
 
 // -----------============================== Cordova details ==============================-----------
 
@@ -379,14 +494,14 @@ export const isNwjsMainProcess = ENVIRONMENT_IS_NODE
  * @see {@link isElectronMain}
  * @see {@link isElectronRenderer}
  * @see {@link isElectronNodeIntegration}
- * @see [electronjs/docs/process.type]{@link https://www.electronjs.org/docs/api/process#processtype-readonly}
+ * @see [electronjs/docs/process.type]{@link https://www.electronjs.org/docs/latest/api/process#processtype-readonly}
  **/
 export const isElectron: boolean = ENVIRONMENT_IS_ELECTRON;
 
 /**
  * Is this is main Electron process?
  *
- * Electron Glossary: [main process]{@link https://www.electronjs.org/docs/glossary#main-process}
+ * Electron Glossary: [main process]{@link https://www.electronjs.org/docs/latest/glossary#main-process}
  *
  * The main process, commonly a file named `main.js`, is the entry point to every Electron app. It controls the life of
  * the app, from open to close. It also manages native elements such as the Menu, Menu Bar, Dock, Tray, etc. The main
@@ -397,16 +512,16 @@ export const isElectron: boolean = ENVIRONMENT_IS_ELECTRON;
  *
  * In Chromium, this process is referred to as the "browser process". It is renamed in Electron to avoid confusion with renderer processes.
  *
- * @see [electronjs/docs/Glossary/main process]{@link https://www.electronjs.org/docs/glossary#main-process}
- * @see [electronjs/docs/Main and Renderer Processes]{@link https://www.electronjs.org/docs/tutorial/quick-start#main-and-renderer-processes}
- * @see [electronjs/docs/process.isMainFrame]{@link https://www.electronjs.org/docs/api/process#processismainframe-readonly}
+ * @see [electronjs/docs/Glossary/main process]{@link https://www.electronjs.org/docs/latest/glossary#main-process}
+ * @see [electronjs/docs/Quick Start]{@link https://www.electronjs.org/docs/latest/tutorial/quick-start}
+ * @see [electronjs/docs/process.isMainFrame]{@link https://www.electronjs.org/docs/latest/api/process#processismainframe-readonly}
  **/
 export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
 
 /**
  * Is this is Renderer process of browser Window in Electron app?
  *
- * Electron Glossary: [renderer process]{@link https://www.electronjs.org/docs/glossary#renderer-process}
+ * Electron Glossary: [renderer process]{@link https://www.electronjs.org/docs/latest/glossary#renderer-process}
  *
  * Note that it can be Renderer process without node integration: {@link isElectronRenderer} = `true` and {@link isElectronNodeIntegration} = `false`.
  *
@@ -417,12 +532,34 @@ export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
  * Electron users, however, have the power to use Node.js APIs in web pages allowing lower level operating system
  * interactions.
  *
- * @see [electronjs/docs/Glossary/renderer process]{@link https://www.electronjs.org/docs/glossary#renderer-process}
- * @see [electronjs/docs/Main and Renderer Processes]{@link https://www.electronjs.org/docs/tutorial/quick-start#main-and-renderer-processes}
+ * @see [electronjs/docs/Glossary/renderer process]{@link https://www.electronjs.org/docs/latest/glossary#renderer-process}
+ * @see [electronjs/docs/Quick Start]{@link https://www.electronjs.org/docs/latest/tutorial/quick-start}
+ * @see [electronjs/docs/Process Model]{@link https://www.electronjs.org/docs/latest/tutorial/process-model}
  **/
-export const isElectronRenderer: boolean = ELECTRON_ENV === ELECTRON__RENDERER
+export const isElectronRenderer: boolean = ELECTRON_ENV === ELECTRON__RENDERER_WITH_NODE_INTEGRATION
     // Determine Electron Renderer process by circumstantial evidence. We assume, if it's WebWorker, it can't be a Renderer process.
     || (ELECTRON_ENV === ELECTRON__NO_NODE_INTEGRATION && !ENVIRONMENT_IS_WEB_WORKER)
+;
+
+/**
+ * Is this is Preload scripts of Renderer process of browser Window in Electron app?
+ *
+ * You can use this value to check if `contextBridge` API is enable (or you can use `process.contextIsolated`).
+ * <br />Error example: `contextBridge API can only be used when contextIsolation is enabled`.
+ *
+ * ---
+ *
+ * Note: With `{ webPreferences: { nodeIntegrationInWorker: true, contextIsolation: false } }` we can't detect preload
+ * process, so this value always be `false` even executing in `preload.js` file.
+ *
+ * @see [electronjs/docs/Process Model/Preload scripts]{@link https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts}
+ * @see [electronjs/docs/Understanding context-isolated processes]{@link https://www.electronjs.org/docs/latest/tutorial/ipc#understanding-context-isolated-processes}
+ * @see [electronjs/docs/Context Isolation]{@link https://www.electronjs.org/docs/latest/tutorial/context-isolation}
+ * @see [electronjs/docs/process.contextIsolated]{@link https://www.electronjs.org/docs/latest/api/process#processcontextisolated-readonly}
+ */
+export const isElectronRendererPreload: boolean = ELECTRON_ENV === ELECTRON__RENDERER_WITH_NODE_INTEGRATION
+    && !ENVIRONMENT_IS_WEB
+    && _toString.call(window) === '[object global]'
 ;
 
 /**
@@ -435,10 +572,11 @@ export const isElectronRenderer: boolean = ELECTRON_ENV === ELECTRON__RENDERER
  *
  * @example opening a new window with node integration:
 ```
- // https://www.electronjs.org/docs/api/browser-window
+ // https://www.electronjs.org/docs/latest/api/browser-window
 var win = new BrowserWindow({
   webPreferences: {
     nodeIntegration: true,// It's false by default
+	contextIsolation: false,// It's true by default
   },
 });
 win.loadURL('http://google.com');
@@ -446,19 +584,20 @@ win.show();
 ```
  * @example opening a new window and running WebWorker on it (without code for Worker running):
 ```
- // https://www.electronjs.org/docs/api/browser-window
+ // https://www.electronjs.org/docs/latest/api/browser-window
 var win = new BrowserWindow({
   webPreferences: {
     nodeIntegrationInWorker: true,// It's false by default
+	contextIsolation: false,// It's true by default
   },
 });
 win.loadURL('https://www.html5rocks.com/en/tutorials/workers/basics/');
 win.show();
  // ...running WebWorker on page...
 ```
- * @see [electronjs/docs/Tag Attributes/nodeintegration]{@link https://www.electronjs.org/docs/api/webview-tag#nodeintegration}
- * @see [electronjs/docs/Tag Attributes/nodeintegrationinsubframes]{@link https://www.electronjs.org/docs/api/webview-tag#nodeintegrationinsubframes}
- * @see [electronjs/docs/new BrowserWindow(options: { webPreferences })/nodeIntegration, nodeIntegrationInWorker, nodeIntegrationInSubFrames]{@link https://www.electronjs.org/docs/api/browser-window#new-browserwindowoptions}
+ * @see [electronjs/docs/Tag Attributes/nodeintegration]{@link https://www.electronjs.org/docs/latest/api/webview-tag#nodeintegration}
+ * @see [electronjs/docs/Tag Attributes/nodeintegrationinsubframes]{@link https://www.electronjs.org/docs/latest/api/webview-tag#nodeintegrationinsubframes}
+ * @see [electronjs/docs/new BrowserWindow(options: { webPreferences })/nodeIntegration, nodeIntegrationInWorker, nodeIntegrationInSubFrames]{@link https://www.electronjs.org/docs/latest/api/browser-window#new-browserwindowoptions}
  */
 export const isElectronNodeIntegration: boolean = ENVIRONMENT_IS_ELECTRON
     && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION
@@ -467,3 +606,50 @@ export const isElectronNodeIntegration: boolean = ENVIRONMENT_IS_ELECTRON
 // -----------============================== ReactNative details ==============================-----------
 
 export const isReactNative: boolean = ENVIRONMENT_IS_REACT_NATIVE;
+
+// -----------============================== Some detailed info (can be used for debug) ==============================-----------
+
+const _envDetails = {
+    isMainThread,
+    isWorkerThread,
+
+    isNodeJS,
+    isNodeJSMainThread,
+    isNodeJSDependentProcess,
+    isNodeJSWorker,
+
+    isWeb,
+    isWebMainThread,
+    isWebDependentWindow,
+    isWebWorker,
+    isWebDedicatedWorker,
+    isWebSharedWorker,
+    isWebServiceWorker,
+    isWebWorklet,
+    isWebPaintWorklet,
+    isWebAudioWorklet,
+
+    isCordova,
+
+    isElectron,
+    isElectronMain,
+    isElectronRenderer,
+    isElectronRendererPreload,
+    isElectronNodeIntegration,
+
+    isReactNative,
+};
+
+export type IEnvDetailsFull = typeof _envDetails;
+export type IEnvDetails = Partial<typeof _envDetails>;
+export type IEnvDetailsKeys = (keyof(typeof _envDetails))[];
+
+export const envDetails: IEnvDetails = Object.keys(_envDetails).reduce((_envDetails, key) => {
+    if (!_envDetails[key]) {
+        delete _envDetails[key];
+    }
+
+    return _envDetails;
+}, { ..._envDetails });
+
+export const envDetailsFull: IEnvDetailsFull = _envDetails;
