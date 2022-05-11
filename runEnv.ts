@@ -194,7 +194,7 @@ const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB
 // ===========================================================================================
 
 /**
- * Is this code running in nodejs **non-Worker** environment? For browser and nodejs.
+ * Is this code running in **non-Worker** environment? For browser and nodejs.
  *
  * `true` if negative {@link isNodeJSWorker} and {@link isWebWorker}, and {@link isWebWorklet}.
  *
@@ -204,7 +204,7 @@ const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB
 export const isMainThread: boolean = ENVIRONMENT_IS_MAIN_THREAD;
 
 /**
- * Is this code running in nodejs **Worker** environment? For browser (worker and worklet) and nodejs (worker).
+ * Is this code running in **Worker** environment? For browser (worker and worklet) and nodejs (worker).
  *
  * `true` if positive {@link isNodeJSWorker} or {@link isWebWorker}, or {@link isWebWorklet}.
  *
@@ -565,8 +565,8 @@ export const isElectronRendererPreload: boolean = ELECTRON_ENV === ELECTRON__REN
 /**
  * Is it Electron process with node integration? One of for `true`:
  * - It's Electron Main process. In this case: {@link isElectronMain} = `true`.
- * - It's Electron Renderer process with `nodeIntegration=true`. In this case: {@link isElectronMain} = `false`, {@link isElectronRenderer} = `true`.
- * - It's WebWorker running in Electron app with `nodeIntegrationInWorker=true`.
+ * - It's Electron Renderer process with `nodeIntegration==true` and `contextIsolation==false`. In this case: {@link isElectronMain} = `false`, {@link isElectronRenderer} = `true`.
+ * - It's WebWorker running in Electron app with `nodeIntegrationInWorker==true` and `contextIsolation==false`.
  * In this case: {@link isElectronMain} = `false` and {@link isElectronRenderer} = `false`, and  {@link isElectron} = `true`, and {@link isWebWorker} = `true`.
  *
  *
@@ -576,7 +576,7 @@ export const isElectronRendererPreload: boolean = ELECTRON_ENV === ELECTRON__REN
 var win = new BrowserWindow({
   webPreferences: {
     nodeIntegration: true,// It's false by default
-	contextIsolation: false,// It's true by default
+    contextIsolation: false,// It's true by default
   },
 });
 win.loadURL('http://google.com');
@@ -588,7 +588,7 @@ win.show();
 var win = new BrowserWindow({
   webPreferences: {
     nodeIntegrationInWorker: true,// It's false by default
-	contextIsolation: false,// It's true by default
+    contextIsolation: false,// It's true by default
   },
 });
 win.loadURL('https://www.html5rocks.com/en/tutorials/workers/basics/');
@@ -598,10 +598,19 @@ win.show();
  * @see [electronjs/docs/Tag Attributes/nodeintegration]{@link https://www.electronjs.org/docs/latest/api/webview-tag#nodeintegration}
  * @see [electronjs/docs/Tag Attributes/nodeintegrationinsubframes]{@link https://www.electronjs.org/docs/latest/api/webview-tag#nodeintegrationinsubframes}
  * @see [electronjs/docs/new BrowserWindow(options: { webPreferences })/nodeIntegration, nodeIntegrationInWorker, nodeIntegrationInSubFrames]{@link https://www.electronjs.org/docs/latest/api/browser-window#new-browserwindowoptions}
+ * @see [Changing the defaults for nodeIntegration and contextIsolation to improve the default security posture of Electron applications]{@link https://github.com/electron/electron/issues/23506}
  */
 export const isElectronNodeIntegration: boolean = ENVIRONMENT_IS_ELECTRON
     && ELECTRON_ENV !== ELECTRON__NO_NODE_INTEGRATION
 ;
+
+// todo: isElectronRendererSandboxed
+//  https://www.electronjs.org/docs/latest/tutorial/sandbox
+//  > Preload scripts
+//  > In order to allow renderer processes to communicate with the main process, preload scripts attached to sandboxed
+//  > renderers will still have a polyfilled subset of Node.js APIs available. A require function similar to Node's
+//  > require module is exposed, but can only import a subset of Electron and Node's built-in modules:
+//  > electron (only renderer process modules), events, timers, url
 
 // -----------============================== ReactNative details ==============================-----------
 

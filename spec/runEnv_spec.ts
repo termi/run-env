@@ -1,6 +1,8 @@
 'use strict';
 
-import {envDetails, IEnvDetailsFull, IEnvDetailsKeys} from '../runEnv';
+import {envDetails, envDetailsFull, IEnvDetailsFull, IEnvDetailsKeys} from '../runEnv';
+import FakeDocument from "../spec_utils/FakeDocument";
+import {FakeProcess} from "../spec_utils/FakeProcess";
 
 function _runEnv_inContext(context: Object): IEnvDetailsFull {
     const replacedContextProps: Record<string, ReturnType<typeof Object.getOwnPropertyDescriptor>> = {};
@@ -58,12 +60,12 @@ function _check_runEnv_props(runEnv: IEnvDetailsFull, trueProps: IEnvDetailsKeys
 }
 
 describe('runEnv', function() {
-    describe('NodeJS process', function() {
-        const like_NodeJSMainTheadContext = {
-            process,
-            window: void 0,
-        };
+    const like_NodeJSMainTheadContext = {
+        process,
+        window: void 0,
+    };
 
+    describe('NodeJS process', function() {
         it('NodeJSMainThead', function() {
             const runEnv_NodeJSMainThead = _runEnv_inContext(like_NodeJSMainTheadContext);
 
@@ -111,26 +113,27 @@ describe('runEnv', function() {
         });
     });
 
-    describe('Web process', function() {
-        const like_mainWebContext = {
-            process: void 0,
-            get window() { return this },
-            document: { [Symbol.toStringTag]: 'HTMLDocument' },
-            navigator: { [Symbol.toStringTag]: 'Navigator' },
-            [Symbol.toStringTag]: 'Window',
-        };
-        const like_WebWorkerContext = Object.defineProperties(Object.defineProperties({
-            importScripts() {},
-            WorkerGlobalScope: { importScripts() {} },
-            WorkerNavigator: class WorkerNavigator { [Symbol.toStringTag]: 'WorkerNavigator' },
-        }, Object.getOwnPropertyDescriptors(like_mainWebContext)), {
-            document: { value: void 0 },
-            window: { value: void 0 },
-            navigator: { get() { return new this.WorkerNavigator(); } },
-        });
+    const like_WebMainThreadContext = {
+        process: void 0,
+        get window() { return this },
+        document: new FakeDocument(),
+        navigator: { [Symbol.toStringTag]: 'Navigator' },
+        [Symbol.toStringTag]: 'Window',
+    };
+    const like_WebWorkerContext = Object.defineProperties(Object.defineProperties({
+        importScripts() {},
+        WorkerGlobalScope: { importScripts() {} },
+        WorkerNavigator: class WorkerNavigator { [Symbol.toStringTag]: 'WorkerNavigator' },
+    }, Object.getOwnPropertyDescriptors(like_WebMainThreadContext)), {
+        // descriptor's below:
+        document: { value: void 0 },
+        window: { value: void 0 },
+        navigator: { get() { return new this.WorkerNavigator(); } },
+    });
 
+    describe('Web process', function() {
         it('WebMainThread', function() {
-            const runEnv_WebMainThread = _runEnv_inContext(like_mainWebContext);
+            const runEnv_WebMainThread = _runEnv_inContext(like_WebMainThreadContext);
 
             expect(runEnv_WebMainThread.isMainThread).toBe(true);
             expect(runEnv_WebMainThread.isWeb).toBe(true);
@@ -147,11 +150,11 @@ describe('runEnv', function() {
         });
 
         it('WebDependentWindow', function() {
-            like_mainWebContext["opener"] = {};
+            like_WebMainThreadContext["opener"] = {};
 
-            const runEnv_WebMainThread = _runEnv_inContext(like_mainWebContext);
+            const runEnv_WebMainThread = _runEnv_inContext(like_WebMainThreadContext);
 
-            delete like_mainWebContext["opener"];
+            delete like_WebMainThreadContext["opener"];
 
             expect(runEnv_WebMainThread.isMainThread).toBe(true);
             expect(runEnv_WebMainThread.isWeb).toBe(true);
@@ -187,6 +190,49 @@ describe('runEnv', function() {
         });
     });
 
+    const like_ElectronMainContext = Object.defineProperties(Object.defineProperties({
+
+    }, Object.getOwnPropertyDescriptors(like_NodeJSMainTheadContext)), {
+        // descriptor's below:
+        document: { value: void 0 },
+        window: { value: void 0 },
+        process: { value: new FakeProcess({
+            versions: {
+                electron: 'x',
+            },
+        }) },
+        navigator: { value: {
+            userAgent: 'FakeElectron Electron/xx.x',
+            [Symbol.toStringTag]: 'Navigator',
+        } },
+    });
+
+    describe('Electron process', function() {
+        it('ElectronMain', function() {
+            const runEnv_WebMainThread = _runEnv_inContext(like_ElectronMainContext);
+
+            expect(runEnv_WebMainThread.isMainThread).toBe(true);
+            expect(runEnv_WebMainThread.isNodeJS).toBe(true);
+            expect(runEnv_WebMainThread.isNodeJSMainThread).toBe(true);
+            expect(runEnv_WebMainThread.isElectron).toBe(true);
+            expect(runEnv_WebMainThread.isElectronMain).toBe(true);
+            expect(runEnv_WebMainThread.isElectronNodeIntegration).toBe(true);
+            expect(runEnv_WebMainThread.isElectronRenderer).toBe(false);
+            expect(runEnv_WebMainThread.isWeb).toBe(false);
+
+            // all other props should be false
+            _check_runEnv_props(runEnv_WebMainThread, [
+                'isMainThread',
+                'isNodeJS',
+                'isNodeJSMainThread',
+                'isElectron',
+                'isElectronMain',
+                'isElectronNodeIntegration',
+            ]);
+        });
+
+    });
+
     describe('envDetails', function() {
         it('should be only `true` values', function() {
             expect(Object.values(envDetails).reduce((obj, value) => {
@@ -194,6 +240,16 @@ describe('runEnv', function() {
 
                 return obj;
             }, {})).toEqual({ true: 1 });
+        });
+    });
+
+    describe('envDetailsFull', function() {
+        it('should be `true` or `false` values', function() {
+            expect(Object.values(envDetailsFull).reduce((obj, value) => {
+                obj[value + ''] = 1;
+
+                return obj;
+            }, {})).toEqual({ true: 1, false: 1 });
         });
     });
 });
