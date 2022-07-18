@@ -64,6 +64,35 @@ describe('runEnv', function() {
         process,
         window: void 0,
     };
+    let prev_value_send: typeof process.send | undefined | null;
+    let prev_value_disconnect: typeof process.disconnect | undefined | null;
+
+    beforeEach(() => {
+        {// jest runs tests in dependent nodejs process, so it would be process.send and process.disconnect
+            prev_value_send = process.send;
+            prev_value_disconnect = process.disconnect;
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            process.send = void 0;
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            process.disconnect = void 0;
+        }
+    });
+    afterEach(() => {
+        if (prev_value_send || prev_value_disconnect) {// jest runs tests in dependent nodejs process, so it would be process.send and process.disconnect
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            process.send = prev_value_send;
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            process.disconnect = prev_value_disconnect;
+
+            prev_value_send = void 0;
+            prev_value_disconnect = void 0;
+        }
+    });
 
     describe('NodeJS process', function() {
         it('NodeJSMainThead', function() {
@@ -200,6 +229,10 @@ describe('runEnv', function() {
             versions: {
                 electron: 'x',
             },
+                // jest runs tests in dependent nodejs process, so it would be process.send and process.disconnect
+                // So we need to redefined it.
+            send: null,
+            disconnect: null,
         }) },
         navigator: { value: {
             userAgent: 'FakeElectron Electron/xx.x',
