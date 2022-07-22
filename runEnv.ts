@@ -1,3 +1,5 @@
+// noinspection JSValidateJSDoc
+
 'use strict';
 
 // https://stackoverflow.com/a/23619712
@@ -177,6 +179,7 @@ const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE
 // Based on https://stackoverflow.com/a/39473604
 // todo: Как выставлять isWeb для ReactNative: в true или в false? Нужно понять, как для ReactNative пишется код и
 //   совместим ли он с кодом для "обычного" Web'а.
+// noinspection JSDeprecatedSymbols
 const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT && _IS_NAVIGATOR && navigator.product == 'ReactNative';
 
 const ENVIRONMENT_IS_MAIN_THREAD = ENVIRONMENT_IS_NODE
