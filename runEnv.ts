@@ -95,6 +95,7 @@ if (_IS_PROCESS) {
 
                     if (!(key in window)) {
                         isJasmine = false;
+
                         break;
                     }
                 }

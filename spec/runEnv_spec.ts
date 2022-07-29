@@ -1,8 +1,10 @@
+// noinspection JSUnusedLocalSymbols
+
 'use strict';
 
-import {envDetails, envDetailsFull, IEnvDetailsFull, IEnvDetailsKeys} from '../runEnv';
+import { envDetails, envDetailsFull, IEnvDetailsFull, IEnvDetailsKeys } from '../runEnv';
 import FakeDocument from "../spec_utils/FakeDocument";
-import {FakeProcess} from "../spec_utils/FakeProcess";
+import { FakeProcess } from "../spec_utils/FakeProcess";
 
 function _runEnv_inContext(context: Object): IEnvDetailsFull {
     const replacedContextProps: Record<string, ReturnType<typeof Object.getOwnPropertyDescriptor>> = {};
@@ -117,8 +119,10 @@ describe('runEnv', function() {
             const prev_value_disconnect = process.disconnect;
 
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            process.send = function(message:any){ return false };
-            process.disconnect = function(){};
+            process.send = function(message: any) {
+                return false;
+            };
+            process.disconnect = function() {};
 
             const runEnv_NodeJSDependentProcess = _runEnv_inContext(like_NodeJSMainTheadContext);
 
@@ -144,20 +148,33 @@ describe('runEnv', function() {
 
     const like_WebMainThreadContext = {
         process: void 0,
-        get window() { return this },
+        get window() {
+            return this;
+        },
         document: new FakeDocument(),
         navigator: { [Symbol.toStringTag]: 'Navigator' },
         [Symbol.toStringTag]: 'Window',
     };
     const like_WebWorkerContext = Object.defineProperties(Object.defineProperties({
         importScripts() {},
-        WorkerGlobalScope: { importScripts() {} },
-        WorkerNavigator: class WorkerNavigator { [Symbol.toStringTag]: 'WorkerNavigator' },
+        WorkerGlobalScope: {
+            importScripts() {
+            },
+        },
+        WorkerNavigator: class WorkerNavigator {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            [Symbol.toStringTag]: 'WorkerNavigator';
+        },
     }, Object.getOwnPropertyDescriptors(like_WebMainThreadContext)), {
         // descriptor's below:
         document: { value: void 0 },
         window: { value: void 0 },
-        navigator: { get() { return new this.WorkerNavigator(); } },
+        navigator: {
+            get() {
+                return new this.WorkerNavigator();
+            },
+        },
     });
 
     describe('Web process', function() {
@@ -219,25 +236,27 @@ describe('runEnv', function() {
         });
     });
 
-    const like_ElectronMainContext = Object.defineProperties(Object.defineProperties({
-
-    }, Object.getOwnPropertyDescriptors(like_NodeJSMainTheadContext)), {
+    const like_ElectronMainContext = Object.defineProperties(Object.defineProperties({}, Object.getOwnPropertyDescriptors(like_NodeJSMainTheadContext)), {
         // descriptor's below:
         document: { value: void 0 },
         window: { value: void 0 },
-        process: { value: new FakeProcess({
-            versions: {
-                electron: 'x',
-            },
+        process: {
+            value: new FakeProcess({
+                versions: {
+                    electron: 'x',
+                },
                 // jest runs tests in dependent nodejs process, so it would be process.send and process.disconnect
                 // So we need to redefined it.
-            send: null,
-            disconnect: null,
-        }) },
-        navigator: { value: {
-            userAgent: 'FakeElectron Electron/xx.x',
-            [Symbol.toStringTag]: 'Navigator',
-        } },
+                send: null,
+                disconnect: null,
+            }),
+        },
+        navigator: {
+            value: {
+                userAgent: 'FakeElectron Electron/xx.x',
+                [Symbol.toStringTag]: 'Navigator',
+            },
+        },
     });
 
     describe('Electron process', function() {
@@ -263,7 +282,6 @@ describe('runEnv', function() {
                 'isElectronNodeIntegration',
             ]);
         });
-
     });
 
     describe('envDetails', function() {
