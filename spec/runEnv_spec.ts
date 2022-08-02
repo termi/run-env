@@ -158,8 +158,7 @@ describe('runEnv', function() {
     const like_WebWorkerContext = Object.defineProperties(Object.defineProperties({
         importScripts() {},
         WorkerGlobalScope: {
-            importScripts() {
-            },
+            importScripts() {},
         },
         WorkerNavigator: class WorkerNavigator {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -287,7 +286,7 @@ describe('runEnv', function() {
     describe('envDetails', function() {
         it('should be only `true` values', function() {
             expect(Object.values(envDetails).reduce((obj, value) => {
-                obj[value + ''] = 1;
+                obj[`${value}`] = 1;
 
                 return obj;
             }, {})).toEqual({ true: 1 });
@@ -297,7 +296,7 @@ describe('runEnv', function() {
     describe('envDetailsFull', function() {
         it('should be `true` or `false` values', function() {
             expect(Object.values(envDetailsFull).reduce((obj, value) => {
-                obj[value + ''] = 1;
+                obj[`${value}`] = 1;
 
                 return obj;
             }, {})).toEqual({ true: 1, false: 1 });

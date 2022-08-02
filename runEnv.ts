@@ -48,6 +48,7 @@ function getElectronEnv() {
     }
 
     // Detect the user agent when the `nodeIntegration` option is set to false
+    // eslint-disable-next-line unicorn/prefer-includes
     if (_IS_NAVIGATOR && typeof navigator["userAgent"] === 'string' && navigator.userAgent.indexOf('Electron') >= 0) {
         return ELECTRON__NO_NODE_INTEGRATION;
     }
