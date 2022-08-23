@@ -148,7 +148,7 @@ const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
     // && typeof globalThis.onmessage !== 'undefined'
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof WorkerGlobalScope !== 'undefined'
     && typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */globalThis)["importScripts"] === 'function'
     && !_IS_DOCUMENT
@@ -158,7 +158,7 @@ const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
     // `TS2403: Subsequent variable declarations must have the same type. Variable 'location' must be of type 'Location', but here has type 'WorkerLocation'.  lib.dom.d.ts(19615, 13): 'location' was also declared here.`
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof WorkerNavigator !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").WorkerNavigator} */navigator) instanceof WorkerNavigator
 ;
 const ENVIRONMENT_IS_WEB_WORKLED = !ENVIRONMENT_IS_NODE
@@ -346,10 +346,10 @@ export const isWebWorker: boolean = ENVIRONMENT_IS_WEB_WORKER;
 export const isWebDedicatedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof DedicatedWorkerGlobalScope !== 'undefined'
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && (/** @type {import("typescript/lib/lib.webworker").DedicatedWorkerGlobalScope} */globalThis) instanceof DedicatedWorkerGlobalScope
 ;
 
@@ -367,7 +367,7 @@ export const isWebDedicatedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
 export const isWebSharedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof SharedWorkerGlobalScope !== 'undefined'
     && typeof (/** @type {import("typescript/lib/lib.webworker").SharedWorkerGlobalScope} */globalThis)["onconnect"] !== 'undefined'
 ;
@@ -385,7 +385,7 @@ export const isWebSharedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
 export const isWebServiceWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof ServiceWorkerGlobalScope !== 'undefined'
     && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis)["skipWaiting"] === 'function'
 ;
@@ -421,10 +421,10 @@ export const isWebWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED;
  */
 export const isWebPaintWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof PaintWorkletGlobalScope !== 'undefined'
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof (globalThis as PaintWorkletGlobalScope).registerPaint === 'function'
 ;
 
@@ -444,10 +444,10 @@ export const isWebPaintWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
  */
 export const isWebAudioWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof AudioWorkletGlobalScope !== 'undefined'
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     && typeof (globalThis as AudioWorkletGlobalScope).registerProcessor === 'function'
 ;
 
@@ -464,7 +464,7 @@ export const isWebAudioWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
  */
 export const isCordova =
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     typeof cordova === "object"
 ;
 

@@ -66,29 +66,29 @@ describe('runEnv', function() {
         process,
         window: void 0,
     };
-    let prev_value_send: typeof process.send | undefined | null;
-    let prev_value_disconnect: typeof process.disconnect | undefined | null;
+    let prev_value_send: typeof process.send | null | undefined;
+    let prev_value_disconnect: typeof process.disconnect | null | undefined;
 
     beforeEach(() => {
         {// jest runs tests in dependent nodejs process, so it would be process.send and process.disconnect
+            // eslint-disable-next-line jest/unbound-method
             prev_value_send = process.send;
+            // eslint-disable-next-line jest/unbound-method
             prev_value_disconnect = process.disconnect;
 
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
             process.send = void 0;
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             process.disconnect = void 0;
         }
     });
     afterEach(() => {
         if (prev_value_send || prev_value_disconnect) {// jest runs tests in dependent nodejs process, so it would be process.send and process.disconnect
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             process.send = prev_value_send;
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             process.disconnect = prev_value_disconnect;
 
             prev_value_send = void 0;
@@ -115,7 +115,9 @@ describe('runEnv', function() {
         });
 
         it('NodeJSDependentProcess', function() {
+            // eslint-disable-next-line jest/unbound-method
             const prev_value_send = process.send;
+            // eslint-disable-next-line jest/unbound-method
             const prev_value_disconnect = process.disconnect;
 
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -162,7 +164,7 @@ describe('runEnv', function() {
         },
         WorkerNavigator: class WorkerNavigator {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             [Symbol.toStringTag]: 'WorkerNavigator';
         },
     }, Object.getOwnPropertyDescriptors(like_WebMainThreadContext)), {
