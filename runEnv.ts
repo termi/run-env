@@ -164,8 +164,7 @@ const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
 const ENVIRONMENT_IS_WEB_WORKLED = !ENVIRONMENT_IS_NODE
     && typeof (globalThis["WorkletGlobalScope"]) !== 'undefined'
 ;
-const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE
-    && typeof window !== 'undefined'
+const ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE = typeof window !== 'undefined'
     && globalThis === window
     && !ENVIRONMENT_IS_WEB_WORKLED
     && !ENVIRONMENT_IS_WEB_WORKER
@@ -177,6 +176,9 @@ const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE
         ? _toString.call(window) === '[object global]'
         : _toString.call(window) === '[object Window]'
     )
+;
+const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE
+    && ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE
 ;
 // Based on https://stackoverflow.com/a/39473604
 // todo: Как выставлять isWeb для ReactNative: в true или в false? Нужно понять, как для ReactNative пишется код и
@@ -286,6 +288,12 @@ export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NO
 
 // -----------============================== Web details ==============================-----------
 
+/**
+ * Is this code running in **WEB** environment with **Node** environment?
+ *
+ * If `true`, {@link isNodeJS} may be `true` or `false`.
+ */
+export const isWebMainThreadCompatible: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE;
 /**
  * Is this code running in **WEB** environment?
  *

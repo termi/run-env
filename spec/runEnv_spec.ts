@@ -2,7 +2,13 @@
 
 'use strict';
 
-import { envDetails, envDetailsFull, IEnvDetailsFull, IEnvDetailsKeys } from '../runEnv';
+import {
+    envDetails,
+    envDetailsFull,
+    IEnvDetailsFull,
+    IEnvDetailsKeys,
+    isWebMainThreadCompatible,
+} from '../runEnv';
 import FakeDocument from "../spec_utils/FakeDocument";
 import { FakeProcess } from "../spec_utils/FakeProcess";
 
@@ -157,6 +163,14 @@ describe('runEnv', function() {
         navigator: { [Symbol.toStringTag]: 'Navigator' },
         [Symbol.toStringTag]: 'Window',
     };
+    const like_WebMainThreadCompatibleContext = {
+        get window() {
+            return this;
+        },
+        document: new FakeDocument(),
+        navigator: { [Symbol.toStringTag]: 'Navigator' },
+        [Symbol.toStringTag]: 'Window',
+    };
     const like_WebWorkerContext = Object.defineProperties(Object.defineProperties({
         importScripts() {},
         WorkerGlobalScope: {
@@ -190,6 +204,23 @@ describe('runEnv', function() {
 
             // all other props should be false
             _check_runEnv_props(runEnv_WebMainThread, [
+                'isMainThread',
+                'isWeb',
+                'isWebMainThread',
+            ]);
+        });
+
+        it('WebMainThreadCompatible', () => {
+            const runEnv_WebMainThreadCompatible = _runEnv_inContext(like_WebMainThreadContext);
+
+            expect(runEnv_WebMainThreadCompatible.isMainThread).toBe(true);
+            expect(runEnv_WebMainThreadCompatible.isWeb).toBe(true);
+            expect(runEnv_WebMainThreadCompatible.isWebMainThread).toBe(true);
+            expect(runEnv_WebMainThreadCompatible.isWebDependentWindow).toBe(false);
+            expect(runEnv_WebMainThreadCompatible.isWebWorker).toBe(false);
+
+            // all other props should be false
+            _check_runEnv_props(runEnv_WebMainThreadCompatible, [
                 'isMainThread',
                 'isWeb',
                 'isWebMainThread',
