@@ -651,6 +651,7 @@ const _envDetails = {
 
     isWeb,
     isWebMainThread,
+    isWebMainThreadCompatible,
     isWebDependentWindow,
     isWebWorker,
     isWebDedicatedWorker,

@@ -7,7 +7,6 @@ import {
     envDetailsFull,
     IEnvDetailsFull,
     IEnvDetailsKeys,
-    isWebMainThreadCompatible,
 } from '../runEnv';
 import FakeDocument from "../spec_utils/FakeDocument";
 import { FakeProcess } from "../spec_utils/FakeProcess";
@@ -164,6 +163,7 @@ describe('runEnv', function() {
         [Symbol.toStringTag]: 'Window',
     };
     const like_WebMainThreadCompatibleContext = {
+        process,
         get window() {
             return this;
         },
@@ -211,19 +211,20 @@ describe('runEnv', function() {
         });
 
         it('WebMainThreadCompatible', () => {
-            const runEnv_WebMainThreadCompatible = _runEnv_inContext(like_WebMainThreadContext);
+            const runEnv_WebMainThreadCompatible = _runEnv_inContext(like_WebMainThreadCompatibleContext);
 
             expect(runEnv_WebMainThreadCompatible.isMainThread).toBe(true);
-            expect(runEnv_WebMainThreadCompatible.isWeb).toBe(true);
-            expect(runEnv_WebMainThreadCompatible.isWebMainThread).toBe(true);
+            expect(runEnv_WebMainThreadCompatible.isWebMainThreadCompatible).toBe(true);
+            expect(runEnv_WebMainThreadCompatible.isWeb).toBe(false);
+            expect(runEnv_WebMainThreadCompatible.isWebMainThread).toBe(false);
             expect(runEnv_WebMainThreadCompatible.isWebDependentWindow).toBe(false);
             expect(runEnv_WebMainThreadCompatible.isWebWorker).toBe(false);
 
-            // all other props should be false
             _check_runEnv_props(runEnv_WebMainThreadCompatible, [
+                'isNodeJS',
+                'isNodeJSMainThread',
                 'isMainThread',
-                'isWeb',
-                'isWebMainThread',
+                'isWebMainThreadCompatible',
             ]);
         });
 
