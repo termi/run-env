@@ -199,6 +199,7 @@ describe('runEnv', function() {
             expect(runEnv_WebMainThread.isMainThread).toBe(true);
             expect(runEnv_WebMainThread.isWeb).toBe(true);
             expect(runEnv_WebMainThread.isWebMainThread).toBe(true);
+            expect(runEnv_WebMainThread.isWebMainThreadCompatible).toBe(true);
             expect(runEnv_WebMainThread.isWebDependentWindow).toBe(false);
             expect(runEnv_WebMainThread.isWebWorker).toBe(false);
 
@@ -207,6 +208,7 @@ describe('runEnv', function() {
                 'isMainThread',
                 'isWeb',
                 'isWebMainThread',
+                'isWebMainThreadCompatible',
             ]);
         });
 
@@ -238,6 +240,7 @@ describe('runEnv', function() {
             expect(runEnv_WebMainThread.isMainThread).toBe(true);
             expect(runEnv_WebMainThread.isWeb).toBe(true);
             expect(runEnv_WebMainThread.isWebMainThread).toBe(true);
+            expect(runEnv_WebMainThread.isWebMainThreadCompatible).toBe(true);
             expect(runEnv_WebMainThread.isWebDependentWindow).toBe(true);
             expect(runEnv_WebMainThread.isWebWorker).toBe(false);
 
@@ -246,6 +249,7 @@ describe('runEnv', function() {
                 'isMainThread',
                 'isWeb',
                 'isWebMainThread',
+                'isWebMainThreadCompatible',
                 'isWebDependentWindow',
             ]);
         });
