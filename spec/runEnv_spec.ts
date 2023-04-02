@@ -177,8 +177,8 @@ describe('runEnv', function() {
             importScripts() {},
         },
         WorkerNavigator: class WorkerNavigator {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore
             [Symbol.toStringTag]: 'WorkerNavigator';
         },
     }, Object.getOwnPropertyDescriptors(like_WebMainThreadContext)), {
@@ -251,6 +251,7 @@ describe('runEnv', function() {
                 'isWebMainThread',
                 'isWebMainThreadCompatible',
                 'isWebDependentWindow',
+                'isWebMainThreadCompatible',
             ]);
         });
 
