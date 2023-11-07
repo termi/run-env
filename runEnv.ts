@@ -117,7 +117,7 @@ function _getDenoEnvVariables() {
         || !globalDeno.version
         || !globalDeno.version.deno
     ) {
-        return [];
+        return void 0;
     }
 
     /**
@@ -156,7 +156,7 @@ function _getDenoEnvVariables() {
 
 const _denoEnvTuple = _getDenoEnvVariables();
 
-const ENVIRONMENT_IS_DENO = !!_denoEnvTuple[0/*globalDeno*/];
+const ENVIRONMENT_IS_DENO = !!_denoEnvTuple?.[0/*globalDeno*/];
 // noinspection PointlessBooleanExpressionJS
 const ENVIRONMENT_IS_DENO_WORKER = ENVIRONMENT_IS_DENO && !!_denoEnvTuple[2/*isWorker*/];
 const ENVIRONMENT_IS_DENO_MAIN_THREAD = ENVIRONMENT_IS_DENO

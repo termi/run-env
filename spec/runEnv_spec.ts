@@ -128,20 +128,22 @@ describe('runEnv', function() {
 
     describe('NodeJS process', function() {
         it('NodeJSMainThead', function() {
-            const { envDetailsFull: runEnv_NodeJSMainThead } = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const runEnv_NodeJSMainThead = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const { envDetails, envDetailsFull } = runEnv_NodeJSMainThead;
 
-            expect(runEnv_NodeJSMainThead.isMainThread).toBe(true);
             expect(runEnv_NodeJSMainThead.isNodeJS).toBe(true);
             expect(runEnv_NodeJSMainThead.isNodeJSMainThread).toBe(true);
-            expect(runEnv_NodeJSMainThead.isWorkerThread).toBe(false);
-            expect(runEnv_NodeJSMainThead.isNodeJSWorker).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isNodeJS: true,
+                isNodeJSMainThread: true,
+            });
 
             // all other props should be false
-            _check_runEnv_props(runEnv_NodeJSMainThead, [
-                'isMainThread',
-                'isNodeJS',
-                'isNodeJSMainThread',
-            ]);
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
 
         it('NodeJSDependentProcess', function() {
@@ -156,25 +158,26 @@ describe('runEnv', function() {
             };
             process.disconnect = function() {};
 
-            const { envDetailsFull: runEnv_NodeJSDependentProcess } = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const runEnv_NodeJSDependentProcess = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const { envDetails, envDetailsFull } = runEnv_NodeJSDependentProcess;
 
             process.send = prev_value_send;
             process.disconnect = prev_value_disconnect;
 
-            expect(runEnv_NodeJSDependentProcess.isMainThread).toBe(true);
             expect(runEnv_NodeJSDependentProcess.isNodeJS).toBe(true);
-            expect(runEnv_NodeJSDependentProcess.isNodeJSMainThread).toBe(true);
             expect(runEnv_NodeJSDependentProcess.isNodeJSDependentProcess).toBe(true);
-            expect(runEnv_NodeJSDependentProcess.isWorkerThread).toBe(false);
-            expect(runEnv_NodeJSDependentProcess.isNodeJSWorker).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isNodeJS: true,
+                isNodeJSMainThread: true,
+                isNodeJSDependentProcess: true,
+            });
 
             // all other props should be false
-            _check_runEnv_props(runEnv_NodeJSDependentProcess, [
-                'isMainThread',
-                'isNodeJS',
-                'isNodeJSMainThread',
-                'isNodeJSDependentProcess',
-            ]);
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
     });
 
@@ -219,83 +222,86 @@ describe('runEnv', function() {
 
     describe('Web process', function() {
         it('WebMainThread', function() {
-            const { envDetailsFull: runEnv_WebMainThread } = _runEnv_inContext(like_WebMainThreadContext);
+            const runEnv_WebMainThread = _runEnv_inContext(like_WebMainThreadContext);
+            const { envDetails, envDetailsFull } = runEnv_WebMainThread;
 
-            expect(runEnv_WebMainThread.isMainThread).toBe(true);
             expect(runEnv_WebMainThread.isWeb).toBe(true);
             expect(runEnv_WebMainThread.isWebMainThread).toBe(true);
-            expect(runEnv_WebMainThread.isWebMainThreadCompatible).toBe(true);
-            expect(runEnv_WebMainThread.isWebDependentWindow).toBe(false);
-            expect(runEnv_WebMainThread.isWebWorker).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isWeb: true,
+                isWebMainThread: true,
+                isWebMainThreadCompatible: true,
+            });
 
             // all other props should be false
-            _check_runEnv_props(runEnv_WebMainThread, [
-                'isMainThread',
-                'isWeb',
-                'isWebMainThread',
-                'isWebMainThreadCompatible',
-            ]);
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
 
         it('WebMainThreadCompatible', () => {
-            const { envDetailsFull: runEnv_WebMainThreadCompatible } = _runEnv_inContext(like_WebMainThreadCompatibleContext);
+            const runEnv_WebMainThreadCompatible = _runEnv_inContext(like_WebMainThreadCompatibleContext);
+            const { envDetails, envDetailsFull } = runEnv_WebMainThreadCompatible;
 
-            expect(runEnv_WebMainThreadCompatible.isMainThread).toBe(true);
             expect(runEnv_WebMainThreadCompatible.isWebMainThreadCompatible).toBe(true);
-            expect(runEnv_WebMainThreadCompatible.isWeb).toBe(false);
-            expect(runEnv_WebMainThreadCompatible.isWebMainThread).toBe(false);
-            expect(runEnv_WebMainThreadCompatible.isWebDependentWindow).toBe(false);
-            expect(runEnv_WebMainThreadCompatible.isWebWorker).toBe(false);
+            expect(runEnv_WebMainThreadCompatible.isNodeJS).toBe(true);
 
-            _check_runEnv_props(runEnv_WebMainThreadCompatible, [
-                'isNodeJS',
-                'isNodeJSMainThread',
-                'isMainThread',
-                'isWebMainThreadCompatible',
-            ]);
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isWebMainThreadCompatible: true,
+                isNodeJS: true,
+                isNodeJSMainThread: true,
+            });
+
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
 
         it('WebDependentWindow', function() {
             like_WebMainThreadContext["opener"] = {};
 
-            const { envDetailsFull: runEnv_WebMainThread } = _runEnv_inContext(like_WebMainThreadContext);
+            const runEnv_WebMainThread = _runEnv_inContext(like_WebMainThreadContext);
 
             delete like_WebMainThreadContext["opener"];
 
-            expect(runEnv_WebMainThread.isMainThread).toBe(true);
+            const { envDetails, envDetailsFull } = runEnv_WebMainThread;
+
             expect(runEnv_WebMainThread.isWeb).toBe(true);
-            expect(runEnv_WebMainThread.isWebMainThread).toBe(true);
-            expect(runEnv_WebMainThread.isWebMainThreadCompatible).toBe(true);
             expect(runEnv_WebMainThread.isWebDependentWindow).toBe(true);
-            expect(runEnv_WebMainThread.isWebWorker).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isWeb: true,
+                isWebMainThread: true,
+                isWebMainThreadCompatible: true,
+                isWebDependentWindow: true,
+            });
 
             // all other props should be false
-            _check_runEnv_props(runEnv_WebMainThread, [
-                'isMainThread',
-                'isWeb',
-                'isWebMainThread',
-                'isWebMainThreadCompatible',
-                'isWebDependentWindow',
-                'isWebMainThreadCompatible',
-            ]);
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
 
         it('WebWorker', function() {
-            const { envDetailsFull: runEnv_WebWorker } = _runEnv_inContext(like_WebWorkerContext);
+            const runEnv_WebWorker = _runEnv_inContext(like_WebWorkerContext);
+            const { envDetails, envDetailsFull } = runEnv_WebWorker;
 
-            expect(runEnv_WebWorker.isWeb).toBe(true);
-            expect(runEnv_WebWorker.isWorkerThread).toBe(true);
             expect(runEnv_WebWorker.isWebWorker).toBe(true);
-            expect(runEnv_WebWorker.isMainThread).toBe(false);
-            expect(runEnv_WebWorker.isWebMainThread).toBe(false);
-            expect(runEnv_WebWorker.isWebDependentWindow).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isWorkerThread: true,
+                isWeb: true,
+                isWebWorker: true,
+            });
 
             // all other props should be false
-            _check_runEnv_props(runEnv_WebWorker, [
-                'isWeb',
-                'isWorkerThread',
-                'isWebWorker',
-            ]);
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
     });
 
@@ -324,26 +330,25 @@ describe('runEnv', function() {
 
     describe('Electron process', function() {
         it('ElectronMain', function() {
-            const { envDetailsFull: runEnv_ElectronMain } = _runEnv_inContext(like_ElectronMainContext);
+            const runEnv_ElectronMain = _runEnv_inContext(like_ElectronMainContext);
+            const { envDetails, envDetailsFull } = runEnv_ElectronMain;
 
-            expect(runEnv_ElectronMain.isMainThread).toBe(true);
             expect(runEnv_ElectronMain.isNodeJS).toBe(true);
-            expect(runEnv_ElectronMain.isNodeJSMainThread).toBe(true);
             expect(runEnv_ElectronMain.isElectron).toBe(true);
-            expect(runEnv_ElectronMain.isElectronMain).toBe(true);
-            expect(runEnv_ElectronMain.isElectronNodeIntegration).toBe(true);
-            expect(runEnv_ElectronMain.isElectronRenderer).toBe(false);
-            expect(runEnv_ElectronMain.isWeb).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isNodeJS: true,
+                isNodeJSMainThread: true,
+                isElectron: true,
+                isElectronMain: true,
+                isElectronNodeIntegration: true,
+            });
 
             // all other props should be false
-            _check_runEnv_props(runEnv_ElectronMain, [
-                'isMainThread',
-                'isNodeJS',
-                'isNodeJSMainThread',
-                'isElectron',
-                'isElectronMain',
-                'isElectronNodeIntegration',
-            ]);
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
     });
 
