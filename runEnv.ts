@@ -12,10 +12,41 @@
 // see also https://github.com/foo123/asynchronous.js/blob/master/asynchronous.js
 // see also https://github.com/iliakan/detect-node
 
-const _IS_PROCESS = typeof process !== 'undefined';
-const _IS_WINDOW = typeof window !== 'undefined';
-const _IS_DOCUMENT = typeof document !== 'undefined';
-const _IS_NAVIGATOR = typeof navigator === 'object';
+// noinspection ThisExpressionReferencesGlobalObjectJS
+const _global = (function getGlobal(this: typeof globalThis) {
+    if (typeof globalThis !== 'undefined') {
+        return globalThis;
+    }
+    // es6-shim
+    // the only reliable means to get the global object is
+    // `Function('return this')()`
+    // However, this causes CSP violations in Chrome apps.
+    if (typeof self !== 'undefined') {
+        return self;
+    }
+    if (typeof window !== 'undefined') {
+        return window;
+    }
+    if (typeof global !== 'undefined') {
+        return global;
+    }
+
+    // throw new Error('unable to locate global object');
+    return this;
+}).call(this as unknown as typeof globalThis);
+
+/**
+ * [`node:process` free solution](https://github.com/flexdinesh/browser-or-node/issues/27)
+ */
+const nodeProcess = _global["process"];
+const _IS_PROCESS = typeof nodeProcess !== 'undefined' && !!nodeProcess;
+const _IS_REQUIRE = typeof require === 'function';
+const _IS_WINDOW = typeof window !== 'undefined' && !!window;
+const _IS_DOCUMENT = typeof document !== 'undefined' && !!document;
+// todo:
+//  [in isJsDom there is no check on navigator.userAgent](https://github.com/flexdinesh/browser-or-node/issues/28)
+//   navigator can be `{appName: 'nodejs'}` todo: checkIsWebCompatibleNavigator(navigator) { return typeof navigator === 'object' && !!navigator && typeof navigator.userAgent === 'string' }
+const _IS_NAVIGATOR = typeof navigator === 'object' && !!navigator;
 const _toString = Object.prototype.toString;
 
 const ELECTRON__MAIN = 1;
@@ -25,7 +56,7 @@ const ELECTRON__WEB_WORKER_NODE_INTEGRATION = 4;
 
 // https://github.com/electron/electron/issues/2288
 // see also: https://github.com/cheton/is-electron/
-function getElectronEnv() {
+function _getElectronEnv() {
     // Renderer process
     // en: https://www.electronjs.org/docs/latest/api/process#processtype-readonly
     // ru: https://www.electronjs.org/ru/docs/latest/api/process#processtype-%D1%82%D0%BE%D0%BB%D1%8C%D0%BA%D0%BE-%D1%87%D1%82%D0%B5%D0%BD%D0%B8%D0%B5
@@ -33,18 +64,18 @@ function getElectronEnv() {
     // * browser - The main process
     // * renderer - A renderer process
     // * worker - In a web worker
-    if (_IS_WINDOW && typeof window.process === 'object' && !!window.process && window.process["type"] === 'renderer') {
+    if (_IS_WINDOW && typeof window["process"] === 'object' && !!window["process"] && window["process"]["type"] === 'renderer') {
         return ELECTRON__RENDERER_WITH_NODE_INTEGRATION;
     }
 
     // Main process
-    if (_IS_PROCESS && typeof process.versions === 'object' && !!process.versions.electron) {
+    if (_IS_PROCESS && typeof nodeProcess.versions === 'object' && !!nodeProcess.versions.electron) {
         // For
         // ```
         // const win = new BrowserWindow({ webPreferences: { nodeIntegrationInWorker: true, contextIsolation: false } });
         // ```
         // process.type should be 'worker'
-        return process["type"] === 'worker' ? ELECTRON__WEB_WORKER_NODE_INTEGRATION : ELECTRON__MAIN;
+        return nodeProcess["type"] === 'worker' ? ELECTRON__WEB_WORKER_NODE_INTEGRATION : ELECTRON__MAIN;
     }
 
     // Detect the user agent when the `nodeIntegration` option is set to false
@@ -56,32 +87,125 @@ function getElectronEnv() {
     return 0;
 }
 
-const ELECTRON_ENV = getElectronEnv();
+const ELECTRON_ENV = _getElectronEnv();
 const ENVIRONMENT_IS_ELECTRON = ELECTRON_ENV !== 0;
 const ENVIRONMENT_IS_ELECTRON_WEB_WORKER_NODE_INTEGRATION = ELECTRON_ENV === ELECTRON__WEB_WORKER_NODE_INTEGRATION;
 
-let ENVIRONMENT_IS_NODE = false;
-let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
-
-if (_IS_PROCESS) {
+let ENVIRONMENT_IS_NODE = _IS_PROCESS
     // Don't get fooled by e.g. browserify environments.
     // Only Node.JS has a process variable that is of [[Class]] process
-    ENVIRONMENT_IS_NODE = _toString.call(process) === "[object process]"
-        // if the checks above will not be enough:
-        // && typeof require === 'function'
-        // && Object.prototype.toString.call(globalThis) === "[object global]"
-        // // from https://github.com/realm/realm-js/blob/992392e477cb2f5b059b21f6f04edb5f5e7073c2/packages/realm-network-transport/src/NetworkTransport.ts#L24
-        // && "node" in process.versions
-    ;
+    && _toString.call(nodeProcess) === "[object process]"
+    // if the checks above will not be enough:
+    // && typeof require === 'function'
+    // && Object.prototype.toString.call(_global) === "[object global]"
+    // // from https://github.com/realm/realm-js/blob/992392e477cb2f5b059b21f6f04edb5f5e7073c2/packages/realm-network-transport/src/NetworkTransport.ts#L24
+    // && "node" in process.versions
+;
+let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
+function _getDenoEnvVariables() {
+    const globalDeno = _global["Deno"] as {
+        version?: {
+            deno: string,
+            v8: string,
+            typescript: string,
+        },
+        [key: string]: unknown,
+    } | undefined;
+
+    if (!globalDeno
+        || !globalDeno.version
+        || !globalDeno.version.deno
+    ) {
+        return [];
+    }
+
+    /**
+     * note: Deno navigator exists in Deno Worker's.
+     */
+    const denoNavigator = _IS_NAVIGATOR
+        ? navigator as unknown as {
+            userAgent: `Deno/${number}.${number}.${number}`,
+            hardwareConcurrency: number,
+            language: string,
+            languages: string[],
+        }
+        : void 0
+    ;
+    /**
+     * @see [Deno Worker]{@link https://deno.land/api?s=Worker}
+     */// @ts-expect-error// eslint-disable-line @typescript-eslint/ban-ts-comment
+    const isWorker = typeof WorkerGlobalScope !== 'undefined'
+        && 'onmessage' in _global
+        && 'postMessage' in _global
+    ;
+    /**
+     * In Deno, importScripts is optional for Worker's.
+     *
+     * @see [Using the "lib" property / "webworker.importscripts"]{@link https://docs.deno.com/runtime/manual/advanced/typescript/configuration#using-the-lib-property}
+     */
+    const is_importScriptsPermissionInWorker = typeof _global["importScripts"] === 'function';
+
+    return [
+        globalDeno,
+        denoNavigator,
+        isWorker,
+        is_importScriptsPermissionInWorker,
+    ] as const;
+}
+
+const _denoEnvTuple = _getDenoEnvVariables();
+
+const ENVIRONMENT_IS_DENO = !!_denoEnvTuple[0/*globalDeno*/];
+// noinspection PointlessBooleanExpressionJS
+const ENVIRONMENT_IS_DENO_WORKER = ENVIRONMENT_IS_DENO && !!_denoEnvTuple[2/*isWorker*/];
+const ENVIRONMENT_IS_DENO_MAIN_THREAD = ENVIRONMENT_IS_DENO
+    && !ENVIRONMENT_IS_DENO_WORKER
+;
+// noinspection PointlessBooleanExpressionJS
+const ENVIRONMENT_IS_DENO_WORKER_WITH_IMPORT_SCRIPTS = ENVIRONMENT_IS_DENO_WORKER
+    && !!_denoEnvTuple[3/*is_importScriptsPermissionInWorker*/]
+;
+
+/**
+ * Version 12.0.0:
+ *  * Fixed `window.name` to default to the empty string, per spec, instead of `"nodejs"`.
+ *  * Fixed the default User-Agent to say "unknown OS" instead of "undefined" when jsdom is used in web browsers.
+ *
+ * @see [jsdom / releases / `window.name == ""` now]{@link https://github.com/jsdom/jsdom/releases/tag/12.0.0}
+ * @see [jsdom / issues / What is the best way to detect if the script is running in JSDOM environment?]{@link https://github.com/jsdom/jsdom/issues/1537}
+ */
+const ENVIRONMENT_IS_JSDOM = (_IS_WINDOW && window.name === 'nodejs')
+    || (_IS_NAVIGATOR
+        && typeof (navigator as ((typeof navigator) | { userAgent?: string })).userAgent === 'string'
+        && (navigator.userAgent.includes('Node.js') || navigator.userAgent.includes('jsdom'))
+    )
+;
+
+const ENVIRONMENT_IS_NWJS = _IS_PROCESS
+    && typeof _global["nw"] === 'object'
+    && _global["nw"]["process"] === nodeProcess
+    // && !!nodeProcess.versions.nw
+    // && !!nodeProcess.__nwjs
+;
+
+if (_IS_PROCESS) {
     if (ENVIRONMENT_IS_NODE) {// Maybe this is Node.js
         if (_IS_WINDOW) {
+            // global `window` is defined
             if (ENVIRONMENT_IS_ELECTRON) {
+                // todo: Support electron with JSDOM (for electron's test environment?)
                 // this is Electron process.
                 //  isNodeJS = true for Main Electron process
                 //  isNodeJS = false for Renderer or without node integration processes
                 ENVIRONMENT_IS_NODE = ELECTRON_ENV === ELECTRON__MAIN;
             }
+            else if (ENVIRONMENT_IS_NWJS) {
+                // todo: nwjs main window is mixed_context with both Node context and DOM context,
+                //  so ONLY for nwjs main window it should be `isNodeJS == true && isWeb == true`.
+                ENVIRONMENT_IS_NODE = true;
+            }
+            // todo: use ENVIRONMENT_ISDOM in this check
             else if (!String(window.print).includes('[native code]')) {
                 // This is workaround for jest+JSDOM due jsdom is used automatically (https://github.com/facebook/jest/issues/3692#issuecomment-304945928)
                 ENVIRONMENT_IS_NODE = true;
@@ -115,7 +239,7 @@ if (_IS_PROCESS) {
             //  isNodeJS = false for nodeIntegrationInWorker=true in a web worker
             ENVIRONMENT_IS_NODE = false;
         }
-        else if (process["browser"]) {
+        else if (nodeProcess["browser"]) {
             // babel process shim
             ENVIRONMENT_IS_NODE = false;
         }
@@ -127,11 +251,14 @@ if (_IS_PROCESS) {
     if (ENVIRONMENT_IS_NODE) {
         try {
             // (-) `const worker_threads = require('worker_threads');`
+            const _requireFunc = _IS_REQUIRE ? require : void 0;
+            // Trying to hide `require('module_name')` from bundlers and builders:
             // Hide require from "rollup", "webpack" and it's friends
-            const worker_threads = (new Function('return req' + 'uire("worker_threads")')());
+            const worker_threads = _makeRequire(_requireFunc, _stringReverse('worker_threads')) as typeof import('worker_threads') | void;
+            // prev version: const worker_threads = (new Function('return req' + 'uire("worker_threads")')());
 
             if (worker_threads && typeof worker_threads["isMainThread"] === 'boolean') {
-                ENVIRONMENT_IS_NODE_MAIN_THREAD = (worker_threads as typeof import("worker_threads")).isMainThread;
+                ENVIRONMENT_IS_NODE_MAIN_THREAD = worker_threads.isMainThread;
             }
             else {
                 ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
@@ -144,13 +271,20 @@ if (_IS_PROCESS) {
     }
 }
 
+/**
+ * Can be Web Worker or Deno Worker.
+ */
 const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
-    // && typeof globalThis.onmessage !== 'undefined'
+    // && typeof 'onmessage' in _global
+    // && typeof 'postMessage' in _global
     // see node_modules/typescript/lib/lib.webworker.d.ts
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     && typeof WorkerGlobalScope !== 'undefined'
-    && typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */globalThis)["importScripts"] === 'function'
+    // in Deno, importScripts is optional for Worker's
+    && (ENVIRONMENT_IS_DENO
+        || typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */_global)["importScripts"] === 'function'
+    )
     && !_IS_DOCUMENT
     && !_IS_WINDOW
     && _IS_NAVIGATOR
@@ -162,39 +296,70 @@ const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
     && typeof WorkerNavigator !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").WorkerNavigator} */navigator) instanceof WorkerNavigator
 ;
 const ENVIRONMENT_IS_WEB_WORKLED = !ENVIRONMENT_IS_NODE
-    && typeof (globalThis["WorkletGlobalScope"]) !== 'undefined'
+    // Deno (now?) not support Worklet's
+    && !ENVIRONMENT_IS_DENO
+    && typeof (_global["WorkletGlobalScope"]) !== 'undefined'
 ;
-const ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE = typeof window !== 'undefined'
-    && globalThis === window
+const ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE = _IS_WINDOW
+    && _global === window
     && !ENVIRONMENT_IS_WEB_WORKLED
     && !ENVIRONMENT_IS_WEB_WORKER
     /*
     In Electon Renderer process (Web Window) with { nodeIntegration: true, contextIsolation: false }: `Object.prototype.toString.call(window) === '[object global]'`.
     Also see: https://www.electronjs.org/docs/latest/api/process#processcontextisolated-readonly
     */
-    && ((ELECTRON_ENV === ELECTRON__RENDERER_WITH_NODE_INTEGRATION && _IS_PROCESS && process["contextIsolated"] === false)
+    && ((ELECTRON_ENV === ELECTRON__RENDERER_WITH_NODE_INTEGRATION && _IS_PROCESS && nodeProcess["contextIsolated"] === false)
         ? _toString.call(window) === '[object global]'
         : _toString.call(window) === '[object Window]'
     )
+    && _IS_DOCUMENT
+    && _IS_NAVIGATOR
 ;
-const ENVIRONMENT_IS_WEB_MAIN_PROCESS = !ENVIRONMENT_IS_NODE
-    && ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE
+const ENVIRONMENT_IS_WEB_PROCESS = ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE
+    && !ENVIRONMENT_IS_NODE
+    && !ENVIRONMENT_IS_DENO
 ;
 // Based on https://stackoverflow.com/a/39473604
 // todo: Как выставлять isWeb для ReactNative: в true или в false? Нужно понять, как для ReactNative пишется код и
 //   совместим ли он с кодом для "обычного" Web'а.
 // noinspection JSDeprecatedSymbols
-const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT && _IS_NAVIGATOR && navigator.product === 'ReactNative';
+const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT
+    && _IS_NAVIGATOR
+    && navigator.product === 'ReactNative'
+;
 
 const ENVIRONMENT_IS_MAIN_THREAD = ENVIRONMENT_IS_NODE
     ? ENVIRONMENT_IS_NODE_MAIN_THREAD
-    : ((!ENVIRONMENT_IS_WEB_WORKER && !ENVIRONMENT_IS_WEB_WORKLED) && ENVIRONMENT_IS_WEB_MAIN_PROCESS)
+    : ENVIRONMENT_IS_DENO
+        ? !ENVIRONMENT_IS_DENO_WORKER
+        : (
+            ENVIRONMENT_IS_WEB_PROCESS
+            && !ENVIRONMENT_IS_WEB_WORKER
+            && !ENVIRONMENT_IS_WEB_WORKLED
+        )
 ;
 const ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD = ENVIRONMENT_IS_NODE
     ? !ENVIRONMENT_IS_NODE_MAIN_THREAD
     : (ENVIRONMENT_IS_WEB_WORKER || ENVIRONMENT_IS_WEB_WORKLED)
 ;
-const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB_WORKER || ENVIRONMENT_IS_WEB_WORKLED;
+const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_PROCESS
+    || (ENVIRONMENT_IS_WEB_WORKER && !ENVIRONMENT_IS_DENO)
+    || ENVIRONMENT_IS_WEB_WORKLED
+;
+
+// Trying to hide `require('module_name')` from bundlers and builders
+function _makeRequire(requireFunc: typeof require | undefined, moduleNameInReverse: string) {
+    if (!requireFunc) {
+        return;
+    }
+
+    return requireFunc(_stringReverse(moduleNameInReverse));
+}
+
+// Trying to hide `require('module_name')` from bundlers and builders
+function _stringReverse(str: string) {
+    return [ ...str ].reverse().join('');
+}
 
 // ===========================================================================================
 // -----------============================== exports ==============================-----------
@@ -203,19 +368,20 @@ const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_MAIN_PROCESS || ENVIRONMENT_IS_WEB
 /**
  * Is this code running in **non-Worker** environment? For browser and nodejs.
  *
- * `true` if negative {@link isNodeJSWorker} and {@link isWebWorker}, and {@link isWebWorklet}.
+ * `true` if negative {@link isNodeJSWorker} and {@link isWebWorker}, and {@link isWebWorklet}, and {@link isDenoWorker}.
  *
  * @see [isNodeJSMainThread]{@link isNodeJSMainThread}
  * @see [isWebMainThread]{@link isWebMainThread}
+ * @see [isDenoMainThread]{@link isDenoMainThread}
  */
 export const isMainThread: boolean = ENVIRONMENT_IS_MAIN_THREAD;
 
 /**
  * Is this code running in **Worker** environment? For browser (worker and worklet) and nodejs (worker).
  *
- * `true` if positive {@link isNodeJSWorker} or {@link isWebWorker}, or {@link isWebWorklet}.
+ * `true` if positive {@link isNodeJSWorker} or {@link isWebWorker}, or {@link isWebWorklet}, or {@link isDenoWorker}.
  *
- * {@link isNodeJSMainThread} and {@link isWebMainThread} will be `false`.
+ * {@link isNodeJSMainThread}, {@link isWebMainThread} and {@link isDenoMainThread} will be `false`.
  */
 export const isWorkerThread: boolean = ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD;
 
@@ -242,8 +408,13 @@ export const isNodeJSMainThread: boolean = ENVIRONMENT_IS_NODE && ENVIRONMENT_IS
 //  cluster.isPrimary: True if the process is a primary. This is determined by the process.env.NODE_UNIQUE_ID. If process.env.NODE_UNIQUE_ID is undefined, then isPrimary is true.
 // Also see https://www.npmjs.com/package/node-ipc
 /**
- * Node.js process is spawned with an IPC channel (see the [Child Process]{@link https://nodejs.org/api/child_process.html}
+ * Is Node.js process is spawned with an IPC channel (see the [Child Process]{@link https://nodejs.org/api/child_process.html}
  * and [Cluster]{@link https://nodejs.org/api/cluster.html} documentation).
+ *
+ * [`process.send`]{@link https://nodejs.org/api/process.html#processsendmessage-sendhandle-options-callback}
+ * and
+ * [`process.disconnect`]{@link https://nodejs.org/api/process.html#processdisconnect}
+ * functions is defined.
  *
  * Node.js docs about IPC channel and subprocess:
  *
@@ -254,10 +425,10 @@ export const isNodeJSMainThread: boolean = ENVIRONMENT_IS_NODE && ENVIRONMENT_IS
  * >
  * > Child Node.js processes will have a process.send() method of their own that allows the child to send messages back to the parent.
  * >
- * > Accessing the IPC channel fd in any way other than [process.send()](https://nodejs.org/api/process.html#process_process_send_message_sendhandle_options_callback)
+ * > Accessing the IPC channel fd in any way other than [process.send()](https://nodejs.org/api/process.html#processsendmessage-sendhandle-options-callback)
  * > or using the IPC channel with a child process that is not a Node.js instance is not supported.
  * >
- * > See example here: [nodejs/docs/child_process/subprocess.send]{@link https://nodejs.org/api/child_process.html#child_process_subprocess_send_message_sendhandle_options_callback}
+ * > See example here: [nodejs/docs/child_process/subprocess.send]{@link https://nodejs.org/api/child_process.html#subprocesssendmessage-sendhandle-options-callback}
  *
  * Node.js docs about Cluster worker processes:
  *
@@ -265,16 +436,16 @@ export const isNodeJSMainThread: boolean = ENVIRONMENT_IS_NODE && ENVIRONMENT_IS
  * >
  * > The cluster module allows easy creation of child processes that all share server ports.
  * >
- * > See example here: [nodejs/docs/cluster/Event:'message']{@link https://nodejs.org/api/cluster.html#cluster_event_message}
+ * > See example here: [nodejs/docs/cluster/Event:'message']{@link https://nodejs.org/api/cluster.html#event-message}
  *
- * @see `cluster.isPrimary` and `cluster.isWorker` from [nodejs/docs/cluster]{@link https://nodejs.org/api/cluster.html#cluster_cluster_isprimary}
- * @see `child_process.[fork/spawn] options.stdio` [nodejs/docs/child_process_options_stdio]{@link https://nodejs.org/api/child_process.html#child_process_options_stdio}
+ * @see `cluster.isPrimary` and `cluster.isWorker` from [nodejs/docs/cluster]{@link https://nodejs.org/api/cluster.html#clusterisprimary}
+ * @see `child_process.[fork/spawn] options.stdio` [nodejs/docs/child_process_options_stdio]{@link https://nodejs.org/api/child_process.html#optionsstdio}
  * @see [isNodeJS]{@link isNodeJS}
  * @see [isNodeJSMainThread]{@link isNodeJSMainThread}
  */
 export const isNodeJSDependentProcess: boolean = ENVIRONMENT_IS_NODE
-    && !!process.send
-    && !!process.disconnect
+    && !!nodeProcess.send
+    && !!nodeProcess.disconnect
 ;
 
 /**
@@ -282,20 +453,89 @@ export const isNodeJSDependentProcess: boolean = ENVIRONMENT_IS_NODE
  *
  * If `true`, {@link isNodeJS} will be `true`, {@link isNodeJSMainThread} will be `false`.
  *
- * @see {@link https://nodejs.org/api/worker_threads.html#worker_threads_class_worker}
+ * @see [nodejs/docs/worker_threads/Worker]{@link https://nodejs.org/api/worker_threads.html#class-worker}
  */
 export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_THREAD;
+
+// -----------============================== Deno details ==============================-----------
+
+/**
+ * Deno: Next-generation JavaScript Runtime.
+ *
+ * @see [isDenoMainThread]{@link isDenoMainThread}
+ * @see [isDenoWorker]{@link isDenoWorker}
+ * @see [isDenoWorkerWithImportScripts]{@link isDenoWorkerWithImportScripts}
+ * @see [Deno | Runtime APIs | namespace Deno]{@link https://deno.land/api?s=Deno}
+ */
+export const isDeno: boolean = ENVIRONMENT_IS_DENO;
+
+/**
+ * Is Deno main thread.
+ *
+ * @see [isDeno]{@link isDeno}
+ * @see [isDenoWorker]{@link isDenoWorker}
+ * @see [isDenoWorkerWithImportScripts]{@link isDenoWorkerWithImportScripts}
+ * @see [Deno | Runtime APIs | namespace Deno]{@link https://deno.land/api?s=Deno}
+ *
+ * @example Deno result example:
+ * {
+ *  isMainThread: true,
+ *  isDeno: true,
+ *  isDenoMainThread: true
+ * }
+ */
+export const isDenoMainThread: boolean = ENVIRONMENT_IS_DENO_MAIN_THREAD;
+
+/**
+ * Is [Deno Worker]{@link https://docs.deno.com/runtime/manual/runtime/workers}.
+ * Deno supports [`Web Worker API`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker}.
+ *
+ * @see [isDeno]{@link isDeno}
+ * @see [isDenoMainThread]{@link isDenoMainThread}
+ * @see [isDenoWorkerWithImportScripts]{@link isDenoWorkerWithImportScripts}
+ *
+ * @example Deno Worker result example:
+ * {
+ *   isWorkerThread: true,
+ *   isDeno: true,
+ *   isDenoWorker: true,
+ *   isWebWorker: true,
+ *   isWebDedicatedWorker: true
+ * }
+ */
+export const isDenoWorker: boolean = ENVIRONMENT_IS_DENO_WORKER;
+
+/**
+ * Is [Deno Worker]{@link https://docs.deno.com/runtime/manual/runtime/workers} with
+ * [`importScripts`]{@link https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/importScripts}
+ * function supports.
+ *
+ * In Deno, `importScripts` is optional for Worker's.
+ *
+ * @see [isDeno]{@link isDeno}
+ * @see [isDenoMainThread]{@link isDenoMainThread}
+ * @see [isDenoWorker]{@link isDenoWorker}
+ * @see [Using the "lib" property / "webworker.importscripts"]{@link https://docs.deno.com/runtime/manual/advanced/typescript/configuration#using-the-lib-property}
+ */
+export const isDenoWorkerWithImportScripts: boolean = ENVIRONMENT_IS_DENO_WORKER_WITH_IMPORT_SCRIPTS;
 
 // -----------============================== Web details ==============================-----------
 
 /**
- * Is this code running in **WEB** environment with **Node** environment?
+ * Is this code running in **WEB** environment with such global objects available:
+ * * [`window`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window}
+ * * [`document`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/document}
+ * * [`navigator`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/navigator}
+
+ * In *common cases* this mean this is fully compatible **WEB** environment.
  *
  * If `true`, {@link isNodeJS} may be `true` or `false`.
  */
 export const isWebMainThreadCompatible: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE;
 /**
  * Is this code running in **WEB** environment?
+ *
+ * If `true`, {@link isNodeJS} will be `false`.
  *
  * @see [isWebDependentWindow]{@link isWebDependentWindow}
  * @see [isWebWorker]{@link isWebWorker}
@@ -320,8 +560,8 @@ export const isWebMainThread: boolean = ENVIRONMENT_IS_WEB && ENVIRONMENT_IS_MAI
  *
  * @see [isWeb]{@link isWeb}
  * @see [isWebMainThread]{@link isWebMainThread}
- * @see [window.open]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/open}
- * @see [window.opener]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/opener}
+ * @see [MDN / window.open]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/open}
+ * @see [MDN / window.opener]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/opener}
  */
 export const isWebDependentWindow: boolean = ENVIRONMENT_IS_WEB && ENVIRONMENT_IS_MAIN_THREAD
     && !!window.opener
@@ -358,7 +598,7 @@ export const isWebDedicatedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     && typeof DedicatedWorkerGlobalScope !== 'undefined'
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
-    && (/** @type {import("typescript/lib/lib.webworker").DedicatedWorkerGlobalScope} */globalThis) instanceof DedicatedWorkerGlobalScope
+    && (/** @type {import("typescript/lib/lib.webworker").DedicatedWorkerGlobalScope} */_global) instanceof DedicatedWorkerGlobalScope
 ;
 
 /**
@@ -377,7 +617,7 @@ export const isWebSharedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     && typeof SharedWorkerGlobalScope !== 'undefined'
-    && typeof (/** @type {import("typescript/lib/lib.webworker").SharedWorkerGlobalScope} */globalThis)["onconnect"] !== 'undefined'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").SharedWorkerGlobalScope} */_global)["onconnect"] !== 'undefined'
 ;
 
 /**
@@ -395,7 +635,7 @@ export const isWebServiceWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     && typeof ServiceWorkerGlobalScope !== 'undefined'
-    && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */globalThis)["skipWaiting"] === 'function'
+    && typeof (/** @type {import("typescript/lib/lib.webworker").ServiceWorkerGlobalScope} */_global)["skipWaiting"] === 'function'
 ;
 
 // -----------============================== Web Worklet's details ==============================-----------
@@ -433,7 +673,7 @@ export const isWebPaintWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
     && typeof PaintWorkletGlobalScope !== 'undefined'
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
-    && typeof (globalThis as PaintWorkletGlobalScope).registerPaint === 'function'
+    && typeof (_global as PaintWorkletGlobalScope).registerPaint === 'function'
 ;
 
 /**
@@ -456,7 +696,7 @@ export const isWebAudioWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
     && typeof AudioWorkletGlobalScope !== 'undefined'
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
-    && typeof (globalThis as AudioWorkletGlobalScope).registerProcessor === 'function'
+    && typeof (_global as AudioWorkletGlobalScope).registerProcessor === 'function'
 ;
 
 // todo:
@@ -476,21 +716,29 @@ export const isCordova =
     typeof cordova === "object"
 ;
 
-/*
 // -----------============================== NW.js details ==============================-----------
 
-// https://nwjs.io/
-export const isNwjsMainProcess = ENVIRONMENT_IS_NODE
-    && (function() {
-        try {
-            return typeof require('nw.gui') !== 'undefined';
-        }
-        catch (e) {
-            return false;
-        }
-    })()
-;
-*/
+/**
+ * NW.js lets you call all Node.js modules directly from DOM and enables a new way of writing applications
+ * with all Web technologies. It was previously known as “node-webkit” project.
+ *
+ * Note that {@link isWebMainThreadCompatible} will be also `true` if this NWJS window is include Web context.
+ *
+ * @see [NW.js Main page]{@link https://nwjs.io/}
+ * @see [NW.js Documentation]{@link https://docs.nwjs.io/en/latest/}
+ *
+ * @example nwjs result example:
+ * {
+ *   isMainThread: true,
+ *   isNWJSMixedContextWindow: true,
+ *   isNodeJS: true,
+ *   isNodeJSMainThread: true,
+ *   isWebMainThreadCompatible: true
+ * }
+ */
+export const isNWJSMixedContextWindow = ENVIRONMENT_IS_NWJS;
+
+// todo: nwjs background process detection?
 
 // -----------============================== Electron details ==============================-----------
 
@@ -638,6 +886,17 @@ export const isElectronNodeIntegration: boolean = ENVIRONMENT_IS_ELECTRON
 
 export const isReactNative: boolean = ENVIRONMENT_IS_REACT_NATIVE;
 
+// -----------============================== JSDON details ==============================-----------
+
+/**
+ * jsdom is a pure-JavaScript implementation of many web standards, notably the WHATWG DOM and HTML Standards, for use
+ * with Node.js. In general, the goal of the project is to emulate enough of a subset of a web browser to be useful
+ * for testing and scraping real-world web applications.
+ *
+ * @see [jsdom githib]{@link https://github.com/jsdom/jsdom#readme}
+ */
+export const isJSDOM: boolean = ENVIRONMENT_IS_JSDOM;
+
 // -----------============================== Some detailed info (can be used for debug) ==============================-----------
 
 const _envDetails = {
@@ -648,6 +907,11 @@ const _envDetails = {
     isNodeJSMainThread,
     isNodeJSDependentProcess,
     isNodeJSWorker,
+
+    isDeno,
+    isDenoMainThread,
+    isDenoWorker,
+    isDenoWorkerWithImportScripts,
 
     isWeb,
     isWebMainThread,
@@ -663,6 +927,8 @@ const _envDetails = {
 
     isCordova,
 
+    isNWJSMixedContextWindow,
+
     isElectron,
     isElectronMain,
     isElectronRenderer,
@@ -670,6 +936,8 @@ const _envDetails = {
     isElectronNodeIntegration,
 
     isReactNative,
+
+    isJSDOM,
 };
 
 export type IEnvDetailsFull = typeof _envDetails;

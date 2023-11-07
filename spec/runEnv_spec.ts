@@ -5,13 +5,15 @@
 import {
     envDetails,
     envDetailsFull,
+    IEnvDetails,
     IEnvDetailsFull,
     IEnvDetailsKeys,
 } from '../runEnv';
 import FakeDocument from "../spec_utils/FakeDocument";
 import { FakeProcess } from "../spec_utils/FakeProcess";
+import { FakeDenoWindow, FakeDenoNavigator } from "../spec_utils/FakeDenoEnv";
 
-function _runEnv_inContext(context: Object): IEnvDetailsFull {
+function _runEnv_inContext(context: Object, removeJSDOMFootprints = true) {
     const replacedContextProps: Record<string, ReturnType<typeof Object.getOwnPropertyDescriptor>> = {};
 
     for (const key of Object.keys(context)) {
@@ -21,15 +23,38 @@ function _runEnv_inContext(context: Object): IEnvDetailsFull {
         if (currentDescriptor) {
             replacedContextProps[key] = currentDescriptor;
         }
+        else {
+            replacedContextProps[key] = {
+                value: void 0,
+                enumerable: false,
+                writable: true,
+                configurable: true,
+            };
+        }
 
         if (newDescriptor) {
             Object.defineProperty(globalThis, key, newDescriptor);
         }
     }
 
+    if (removeJSDOMFootprints) {
+        if (!!window && window.name === 'nodejs') {
+            window.name = '';
+        }
+
+        if (!!globalThis["navigator"] && /(Node\.js|jsdom)/.test(navigator.userAgent)) {
+            Object.defineProperty(navigator, 'userAgent', {
+                value: 'NOT A JSDOM',
+                enumerable: false,
+                writable: false,
+                configurable: true,
+            });
+        }
+    }
+
     jest.resetModules();
 
-    const runEnv_Module = require('../runEnv');
+    const runEnv_Module = require('../runEnv') as typeof import('../runEnv');
 
     for (const key of Object.keys(replacedContextProps)) {
         const descriptor = replacedContextProps[key];
@@ -39,7 +64,7 @@ function _runEnv_inContext(context: Object): IEnvDetailsFull {
         }
     }
 
-    return runEnv_Module.envDetailsFull;
+    return runEnv_Module;
 }
 
 const specialPropsMap = {
@@ -103,7 +128,7 @@ describe('runEnv', function() {
 
     describe('NodeJS process', function() {
         it('NodeJSMainThead', function() {
-            const runEnv_NodeJSMainThead = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const { envDetailsFull: runEnv_NodeJSMainThead } = _runEnv_inContext(like_NodeJSMainTheadContext);
 
             expect(runEnv_NodeJSMainThead.isMainThread).toBe(true);
             expect(runEnv_NodeJSMainThead.isNodeJS).toBe(true);
@@ -131,7 +156,7 @@ describe('runEnv', function() {
             };
             process.disconnect = function() {};
 
-            const runEnv_NodeJSDependentProcess = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const { envDetailsFull: runEnv_NodeJSDependentProcess } = _runEnv_inContext(like_NodeJSMainTheadContext);
 
             process.send = prev_value_send;
             process.disconnect = prev_value_disconnect;
@@ -194,7 +219,7 @@ describe('runEnv', function() {
 
     describe('Web process', function() {
         it('WebMainThread', function() {
-            const runEnv_WebMainThread = _runEnv_inContext(like_WebMainThreadContext);
+            const { envDetailsFull: runEnv_WebMainThread } = _runEnv_inContext(like_WebMainThreadContext);
 
             expect(runEnv_WebMainThread.isMainThread).toBe(true);
             expect(runEnv_WebMainThread.isWeb).toBe(true);
@@ -213,7 +238,7 @@ describe('runEnv', function() {
         });
 
         it('WebMainThreadCompatible', () => {
-            const runEnv_WebMainThreadCompatible = _runEnv_inContext(like_WebMainThreadCompatibleContext);
+            const { envDetailsFull: runEnv_WebMainThreadCompatible } = _runEnv_inContext(like_WebMainThreadCompatibleContext);
 
             expect(runEnv_WebMainThreadCompatible.isMainThread).toBe(true);
             expect(runEnv_WebMainThreadCompatible.isWebMainThreadCompatible).toBe(true);
@@ -233,7 +258,7 @@ describe('runEnv', function() {
         it('WebDependentWindow', function() {
             like_WebMainThreadContext["opener"] = {};
 
-            const runEnv_WebMainThread = _runEnv_inContext(like_WebMainThreadContext);
+            const { envDetailsFull: runEnv_WebMainThread } = _runEnv_inContext(like_WebMainThreadContext);
 
             delete like_WebMainThreadContext["opener"];
 
@@ -256,7 +281,7 @@ describe('runEnv', function() {
         });
 
         it('WebWorker', function() {
-            const runEnv_WebWorker = _runEnv_inContext(like_WebWorkerContext);
+            const { envDetailsFull: runEnv_WebWorker } = _runEnv_inContext(like_WebWorkerContext);
 
             expect(runEnv_WebWorker.isWeb).toBe(true);
             expect(runEnv_WebWorker.isWorkerThread).toBe(true);
@@ -299,19 +324,19 @@ describe('runEnv', function() {
 
     describe('Electron process', function() {
         it('ElectronMain', function() {
-            const runEnv_WebMainThread = _runEnv_inContext(like_ElectronMainContext);
+            const { envDetailsFull: runEnv_ElectronMain } = _runEnv_inContext(like_ElectronMainContext);
 
-            expect(runEnv_WebMainThread.isMainThread).toBe(true);
-            expect(runEnv_WebMainThread.isNodeJS).toBe(true);
-            expect(runEnv_WebMainThread.isNodeJSMainThread).toBe(true);
-            expect(runEnv_WebMainThread.isElectron).toBe(true);
-            expect(runEnv_WebMainThread.isElectronMain).toBe(true);
-            expect(runEnv_WebMainThread.isElectronNodeIntegration).toBe(true);
-            expect(runEnv_WebMainThread.isElectronRenderer).toBe(false);
-            expect(runEnv_WebMainThread.isWeb).toBe(false);
+            expect(runEnv_ElectronMain.isMainThread).toBe(true);
+            expect(runEnv_ElectronMain.isNodeJS).toBe(true);
+            expect(runEnv_ElectronMain.isNodeJSMainThread).toBe(true);
+            expect(runEnv_ElectronMain.isElectron).toBe(true);
+            expect(runEnv_ElectronMain.isElectronMain).toBe(true);
+            expect(runEnv_ElectronMain.isElectronNodeIntegration).toBe(true);
+            expect(runEnv_ElectronMain.isElectronRenderer).toBe(false);
+            expect(runEnv_ElectronMain.isWeb).toBe(false);
 
             // all other props should be false
-            _check_runEnv_props(runEnv_WebMainThread, [
+            _check_runEnv_props(runEnv_ElectronMain, [
                 'isMainThread',
                 'isNodeJS',
                 'isNodeJSMainThread',
@@ -320,6 +345,108 @@ describe('runEnv', function() {
                 'isElectronNodeIntegration',
             ]);
         });
+    });
+
+    const fakeDenoWindow = new FakeDenoWindow();
+    const like_DenoContext = {
+        process: void 0,
+        document: void 0,
+        window: fakeDenoWindow,
+        navigator: fakeDenoWindow.navigator,
+        Deno: fakeDenoWindow.Deno,
+    };
+    const like_DenoWorkerContext = {
+        ...like_WebWorkerContext,
+        process: void 0,
+        document: void 0,
+        navigator: fakeDenoWindow.navigator,
+        Deno: fakeDenoWindow.Deno,
+        WorkerNavigator: FakeDenoNavigator,
+        DedicatedWorkerGlobalScope: Object.getPrototypeOf(globalThis).constructor,
+    };
+
+    describe('Deno context', function() {
+        it('DenoMain', function() {
+            const runEnv_DenoMain = _runEnv_inContext(like_DenoContext);
+            const {
+                envDetails,
+                envDetailsFull,
+            } = runEnv_DenoMain;
+
+            expect(runEnv_DenoMain.isDeno).toBe(true);
+            expect(runEnv_DenoMain.isNodeJS).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isDeno: true,
+                isDenoMainThread: true,
+            });
+
+            // all other props should be false
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
+        });
+
+        it('DenoWorker - with "importScripts" function', function() {
+            const runEnv_DenoMain = _runEnv_inContext(like_DenoWorkerContext);
+            const {
+                envDetails,
+                envDetailsFull,
+            } = runEnv_DenoMain;
+
+            expect(runEnv_DenoMain.isDeno).toBe(true);
+            expect(runEnv_DenoMain.isDenoWorker).toBe(true);
+            expect(runEnv_DenoMain.isNodeJS).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isWorkerThread: true,
+                isDeno: true,
+                isDenoWorker: true,
+                isDenoWorkerWithImportScripts: true,
+                isWebWorker: true,
+                isWebDedicatedWorker: true,
+            });
+
+            // all other props should be false
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
+        });
+
+        it('DenoWorker - without "importScripts" function', function() {
+            const like_DenoWorkerContext_without_importScripts = { ...like_DenoWorkerContext };
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore
+            delete like_DenoWorkerContext_without_importScripts["importScripts"];
+
+            const runEnv_DenoMain = _runEnv_inContext(like_DenoWorkerContext_without_importScripts);
+            const {
+                envDetails,
+                envDetailsFull,
+            } = runEnv_DenoMain;
+
+            expect(runEnv_DenoMain.isDeno).toBe(true);
+            expect(runEnv_DenoMain.isDenoWorker).toBe(true);
+            expect(runEnv_DenoMain.isNodeJS).toBe(false);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isWorkerThread: true,
+                isDeno: true,
+                isDenoWorker: true,
+                isWebWorker: true,
+                isWebDedicatedWorker: true,
+            });
+
+            // all other props should be false
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
+        });
+
+        // todo: add JSDOM tests
+        // todo: add NWJS tests
     });
 
     describe('envDetails', function() {
