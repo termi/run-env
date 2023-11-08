@@ -1,4 +1,4 @@
-// noinspection JSUnusedLocalSymbols
+// noinspection JSValidateJSDoc,TypeScriptUnresolvedVariable,TypeScriptLibrary,JSUnusedLocalSymbols,TypeScriptUnresolvedFunction
 
 'use strict';
 
@@ -215,6 +215,7 @@ describe('runEnv', function() {
         window: { value: void 0 },
         navigator: {
             get() {
+                // noinspection TypeScriptValidateTypes
                 return new this.WorkerNavigator();
             },
         },

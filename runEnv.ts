@@ -1,4 +1,4 @@
-// noinspection JSValidateJSDoc
+// noinspection JSValidateJSDoc,TypeScriptUnresolvedVariable,TypeScriptLibrary
 
 'use strict';
 
@@ -460,6 +460,8 @@ export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NO
 // -----------============================== Deno details ==============================-----------
 
 /**
+ * Is this code running in [Deno]{@link https://deno.land/} environment?
+ *
  * Deno: Next-generation JavaScript Runtime.
  *
  * @see [isDenoMainThread]{@link isDenoMainThread}
@@ -529,7 +531,7 @@ export const isDenoWorkerWithImportScripts: boolean = ENVIRONMENT_IS_DENO_WORKER
 
  * In *common cases* this mean this is fully compatible **WEB** environment.
  *
- * If `true`, {@link isNodeJS} may be `true` or `false`.
+ * If `true`, one of ({@link isNodeJS}, {@link isDeno}, {@link isNWJSMixedContextWindow}, {@link isElectron}, etc) may be `true`.
  */
 export const isWebMainThreadCompatible: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE;
 /**
@@ -584,7 +586,7 @@ export const isWebWorker: boolean = ENVIRONMENT_IS_WEB_WORKER;
 /**
  * Is this code running in **DedicatedWorker** environment?
  *
- * If `true`,  {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
+ * If `true`, {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
  *
  * @see [MDN / DedicatedWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorker}
  * @see [MDN / DedicatedWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope}
@@ -604,7 +606,7 @@ export const isWebDedicatedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
 /**
  * Is this code running in **SharedWorker** environment?
  *
- * If `true`,  {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
+ * If `true`, {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
  *
  * @see [MDN / SharedWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/SharedWorker}
  * @see [MDN / SharedWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/SharedWorkerGlobalScope}
@@ -623,7 +625,7 @@ export const isWebSharedWorker: boolean = ENVIRONMENT_IS_WEB_WORKER
 /**
  * Is this code running in **ServiceWorker** environment?
  *
- * If `true`,  {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
+ * If `true`, {@link isWebWorker} will be `true` and {@link isWeb} will be `true`.
  *
  * @see [MDN / ServiceWorker]{@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorker}
  * @see [MDN / ServiceWorkerGlobalScope]{@link https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope}
@@ -658,7 +660,7 @@ export const isWebWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED;
 /**
  * Is this code running in **PaintWorklet** environment?
  *
- * If {@link isWebAudioWorklet} = `true`,  {@link isWebWorklet} always will be `true` and {@link isWeb} always will be `true`.
+ * If {@link isWebPaintWorklet} = `true`, {@link isWebWorklet} always will be `true` and {@link isWeb} always will be `true`.
  *
  * @see [isWebWorklet]{@link isWebWorklet}
  * @see [MDN / PaintWorklet]{@link https://developer.mozilla.org/en-US/docs/Web/API/PaintWorklet}
@@ -679,7 +681,7 @@ export const isWebPaintWorklet: boolean = ENVIRONMENT_IS_WEB_WORKLED
 /**
  * Is this code running in **AudioWorklet** environment?
  *
- * If {@link isWebAudioWorklet} = `true`,  {@link isWebWorklet} always will be `true` and {@link isWeb} always will be `true`.
+ * If {@link isWebAudioWorklet} = `true`, {@link isWebWorklet} always will be `true` and {@link isWeb} always will be `true`.
  *
  * @see [isWebWorklet]{@link isWebWorklet}
  * @see [MDN / AudioWorklet]{@link https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet}
@@ -884,9 +886,12 @@ export const isElectronNodeIntegration: boolean = ENVIRONMENT_IS_ELECTRON
 
 // -----------============================== ReactNative details ==============================-----------
 
+/**
+ * Is running in [ReactNative]{@link https://reactnative.dev/} environment?
+ */
 export const isReactNative: boolean = ENVIRONMENT_IS_REACT_NATIVE;
 
-// -----------============================== JSDON details ==============================-----------
+// -----------============================== JSDOM details ==============================-----------
 
 /**
  * jsdom is a pure-JavaScript implementation of many web standards, notably the WHATWG DOM and HTML Standards, for use

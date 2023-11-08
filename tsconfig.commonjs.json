@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./build/dist/cjs",
+    "removeComments": false,
+    "target": "es2017",
+    "declaration": true,
+    "moduleResolution": "node"
+  }
+}
