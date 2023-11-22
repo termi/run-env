@@ -136,6 +136,27 @@ function supports.
 
 In Deno, `importScripts` is optional for Worker's.
 
+### [Bun](https://bun.sh/docs)
+
+#### `isBun`
+
+Is this code running in Bun runtime?
+
+#### `isBunMainThread`
+
+Is Bun main thread.
+
+#### `isBunWorker`
+
+Is [Bun Worker](https://bun.sh/docs/api/workers).
+
+Bun implements a <u>minimal version</u> of the [`Web Worker API`](https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker)
+with extensions that make it work better for server-side use cases.
+Like the rest of Bun, Worker in Bun support CommonJS, ES Modules, TypeScript, JSX, TSX and more out of the box.
+No extra build steps are necessary.
+
+Bun Worker is NOT a Web-like WebWorker compatible, but more like NodeJS Workers.
+
 ### Web
 
 #### `isWebMainThreadCompatible`
@@ -148,6 +169,12 @@ Is this code running in **WEB** environment with such global objects available:
 In *common cases* this mean this is fully compatible **WEB** environment.
 
 If `true`, one of (`isNodeJS`, `isDeno`, `isNWJSMixedContextWindow`, `isElectron` etc) may be `true`.
+
+#### `isWebWorkerThreadCompatible`
+
+Is this code running in **WebWorker-like** environment
+
+In *common cases* this mean this is fully compatible **WebWorker** environment.
 
 #### `isWeb`
 

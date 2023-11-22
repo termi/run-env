@@ -133,13 +133,6 @@ function _getDenoEnvVariables() {
         : void 0
     ;
     /**
-     * @see [Deno Worker]{@link https://deno.land/api?s=Worker}
-     */// @ts-expect-error// eslint-disable-line @typescript-eslint/ban-ts-comment
-    const isWorker = typeof WorkerGlobalScope !== 'undefined'
-        && 'onmessage' in _global
-        && 'postMessage' in _global
-    ;
-    /**
      * In Deno, importScripts is optional for Worker's.
      *
      * @see [Using the "lib" property / "webworker.importscripts"]{@link https://docs.deno.com/runtime/manual/advanced/typescript/configuration#using-the-lib-property}
@@ -149,7 +142,6 @@ function _getDenoEnvVariables() {
     return [
         globalDeno,
         denoNavigator,
-        isWorker,
         is_importScriptsPermissionInWorker,
     ] as const;
 }
@@ -157,14 +149,12 @@ function _getDenoEnvVariables() {
 const _denoEnvTuple = _getDenoEnvVariables();
 
 const ENVIRONMENT_IS_DENO = !!_denoEnvTuple?.[0/*globalDeno*/];
-// noinspection PointlessBooleanExpressionJS
-const ENVIRONMENT_IS_DENO_WORKER = ENVIRONMENT_IS_DENO && !!_denoEnvTuple[2/*isWorker*/];
-const ENVIRONMENT_IS_DENO_MAIN_THREAD = ENVIRONMENT_IS_DENO
-    && !ENVIRONMENT_IS_DENO_WORKER
-;
-// noinspection PointlessBooleanExpressionJS
-const ENVIRONMENT_IS_DENO_WORKER_WITH_IMPORT_SCRIPTS = ENVIRONMENT_IS_DENO_WORKER
-    && !!_denoEnvTuple[3/*is_importScriptsPermissionInWorker*/]
+
+/**
+ * [Bun APIs]{@link https://bun.sh/docs/runtime/bun-apis}
+ */
+const ENVIRONMENT_IS_BUN = typeof Bun !== 'undefined'
+    && typeof Bun.version === 'string'
 ;
 
 /**
@@ -249,38 +239,54 @@ if (_IS_PROCESS) {
     }
 
     if (ENVIRONMENT_IS_NODE) {
-        try {
-            // (-) `const worker_threads = require('worker_threads');`
-            const _requireFunc = _IS_REQUIRE ? require : void 0;
-            // Trying to hide `require('module_name')` from bundlers and builders:
-            // Hide require from "rollup", "webpack" and it's friends
-            const worker_threads = _makeRequire(_requireFunc, _stringReverse('worker_threads')) as typeof import('worker_threads') | void;
-            // prev version: const worker_threads = (new Function('return req' + 'uire("worker_threads")')());
+        if (ENVIRONMENT_IS_BUN) {
+            ENVIRONMENT_IS_NODE_MAIN_THREAD = Bun.isMainThread;
+        }
+        else {
+            try {
+                // (-) `const worker_threads = require('worker_threads');`
+                const _requireFunc = _IS_REQUIRE ? require : void 0;
+                // Trying to hide `require('module_name')` from bundlers and builders:
+                // Hide require from "rollup", "webpack" and it's friends
+                const worker_threads = _makeRequire(_requireFunc, _stringReverse('worker_threads')) as typeof import('worker_threads') | void;
+                // prev version: const worker_threads = (new Function('return req' + 'uire("worker_threads")')());
 
-            if (worker_threads && typeof worker_threads["isMainThread"] === 'boolean') {
-                ENVIRONMENT_IS_NODE_MAIN_THREAD = worker_threads.isMainThread;
+                if (worker_threads && typeof worker_threads["isMainThread"] === 'boolean') {
+                    ENVIRONMENT_IS_NODE_MAIN_THREAD = worker_threads.isMainThread;
+                }
+                else {
+                    ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
+                }
             }
-            else {
+            catch {
+                // old nodejs without Worker's support
                 ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
             }
-        }
-        catch {
-            // old nodejs without Worker's support
-            ENVIRONMENT_IS_NODE_MAIN_THREAD = true;
         }
     }
 }
 
 /**
- * Can be Web Worker or Deno Worker.
+ * see node_modules/typescript/lib/lib.webworker.d.ts
  */
-const ENVIRONMENT_IS_WEB_WORKER = !ENVIRONMENT_IS_NODE
-    // && typeof 'onmessage' in _global
-    // && typeof 'postMessage' in _global
-    // see node_modules/typescript/lib/lib.webworker.d.ts
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-    && typeof WorkerGlobalScope !== 'undefined'
+const ENVIRONMENT_MAYBE_IS_WORKER_THREAD = typeof WorkerGlobalScope !== 'undefined'
+    && 'onmessage' in _global
+    && 'postMessage' in _global
+;
+// console.log(1, (!ENVIRONMENT_IS_NODE  || ENVIRONMENT_IS_BUN));
+// console.log(2, ENVIRONMENT_MAYBE_IS_WORKER_THREAD)
+// console.log(3, typeof importScripts)
+// console.log(4, _IS_DOCUMENT, _IS_WINDOW, _IS_NAVIGATOR)
+// console.log(5, typeof WorkerNavigator, typeof WorkerNavigator !== 'undefined' && (/** @type {import("typescript/lib/lib.webworker").WorkerNavigator} */navigator) instanceof WorkerNavigator)
+// /
+/**
+ * Can be:
+ * * Web Worker
+ * * [Deno Worker]{@link https://deno.land/api?s=Worker}.
+ * * Bun Worker
+ */
+const ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE = (!ENVIRONMENT_IS_NODE || ENVIRONMENT_IS_BUN)
+    && ENVIRONMENT_MAYBE_IS_WORKER_THREAD
     // in Deno, importScripts is optional for Worker's
     && (ENVIRONMENT_IS_DENO
         || typeof (/** @type {import("typescript/lib/lib.webworker").WorkerGlobalScope} */_global)["importScripts"] === 'function'
@@ -303,7 +309,7 @@ const ENVIRONMENT_IS_WEB_WORKLED = !ENVIRONMENT_IS_NODE
 const ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE = _IS_WINDOW
     && _global === window
     && !ENVIRONMENT_IS_WEB_WORKLED
-    && !ENVIRONMENT_IS_WEB_WORKER
+    && !ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
     /*
     In Electon Renderer process (Web Window) with { nodeIntegration: true, contextIsolation: false }: `Object.prototype.toString.call(window) === '[object global]'`.
     Also see: https://www.electronjs.org/docs/latest/api/process#processcontextisolated-readonly
@@ -331,21 +337,22 @@ const ENVIRONMENT_IS_REACT_NATIVE = !_IS_DOCUMENT
 const ENVIRONMENT_IS_MAIN_THREAD = ENVIRONMENT_IS_NODE
     ? ENVIRONMENT_IS_NODE_MAIN_THREAD
     : ENVIRONMENT_IS_DENO
-        ? !ENVIRONMENT_IS_DENO_WORKER
+        ? !ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
         : (
             ENVIRONMENT_IS_WEB_PROCESS
-            && !ENVIRONMENT_IS_WEB_WORKER
+            && !ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
             && !ENVIRONMENT_IS_WEB_WORKLED
         )
 ;
 const ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD = ENVIRONMENT_IS_NODE
     ? !ENVIRONMENT_IS_NODE_MAIN_THREAD
-    : (ENVIRONMENT_IS_WEB_WORKER || ENVIRONMENT_IS_WEB_WORKLED)
+    : (ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE || ENVIRONMENT_IS_WEB_WORKLED)
 ;
 const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_PROCESS
-    || (ENVIRONMENT_IS_WEB_WORKER && !ENVIRONMENT_IS_DENO)
+    || (ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE && !ENVIRONMENT_IS_DENO && !ENVIRONMENT_IS_BUN)
     || ENVIRONMENT_IS_WEB_WORKLED
 ;
+const ENVIRONMENT_IS_WEB_WORKER = ENVIRONMENT_IS_WEB && ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE;
 
 // Trying to hide `require('module_name')` from bundlers and builders
 function _makeRequire(requireFunc: typeof require | undefined, moduleNameInReverse: string) {
@@ -455,7 +462,9 @@ export const isNodeJSDependentProcess: boolean = ENVIRONMENT_IS_NODE
  *
  * @see [nodejs/docs/worker_threads/Worker]{@link https://nodejs.org/api/worker_threads.html#class-worker}
  */
-export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE && !ENVIRONMENT_IS_NODE_MAIN_THREAD;
+export const isNodeJSWorker: boolean = ENVIRONMENT_IS_NODE
+    && !ENVIRONMENT_IS_NODE_MAIN_THREAD
+;
 
 // -----------============================== Deno details ==============================-----------
 
@@ -486,7 +495,9 @@ export const isDeno: boolean = ENVIRONMENT_IS_DENO;
  *  isDenoMainThread: true
  * }
  */
-export const isDenoMainThread: boolean = ENVIRONMENT_IS_DENO_MAIN_THREAD;
+export const isDenoMainThread: boolean = ENVIRONMENT_IS_DENO
+    && !ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
+;
 
 /**
  * Is [Deno Worker]{@link https://docs.deno.com/runtime/manual/runtime/workers}.
@@ -501,11 +512,12 @@ export const isDenoMainThread: boolean = ENVIRONMENT_IS_DENO_MAIN_THREAD;
  *   isWorkerThread: true,
  *   isDeno: true,
  *   isDenoWorker: true,
- *   isWebWorker: true,
- *   isWebDedicatedWorker: true
+ *   isWebWorkerThreadCompatible: true
  * }
  */
-export const isDenoWorker: boolean = ENVIRONMENT_IS_DENO_WORKER;
+export const isDenoWorker: boolean = ENVIRONMENT_IS_DENO
+    && ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
+;
 
 /**
  * Is [Deno Worker]{@link https://docs.deno.com/runtime/manual/runtime/workers} with
@@ -519,12 +531,80 @@ export const isDenoWorker: boolean = ENVIRONMENT_IS_DENO_WORKER;
  * @see [isDenoWorker]{@link isDenoWorker}
  * @see [Using the "lib" property / "webworker.importscripts"]{@link https://docs.deno.com/runtime/manual/advanced/typescript/configuration#using-the-lib-property}
  */
-export const isDenoWorkerWithImportScripts: boolean = ENVIRONMENT_IS_DENO_WORKER_WITH_IMPORT_SCRIPTS;
+export const isDenoWorkerWithImportScripts: boolean = ENVIRONMENT_IS_DENO
+    && ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
+    && !!_denoEnvTuple[2/*is_importScriptsPermissionInWorker*/]
+;
+
+// -----------============================== Bun details ==============================-----------
+
+/**
+ * Is this code running in Bun runtime?
+ *
+ * Bun is a fast JavaScript all-in-one toolkit.
+ *
+ * Develop, test, run, and bundle JavaScript & TypeScript projects—all with Bun. Bun is an all-in-one JavaScript
+ * runtime & toolkit designed for speed, complete with a bundler, test runner, and Node.js-compatible package manager.
+ *
+ * @see [What is Bun?]{@link https://bun.sh/docs}
+ */
+export const isBun: boolean = ENVIRONMENT_IS_BUN;
+
+
+/**
+ * Is Bun main thread.
+ *
+ * @see [isBun]{@link isBun}
+ * @see [isBunWorker]{@link isBunWorker}
+ * @see [What is Bun?]{@link https://bun.sh/docs}
+ *
+ * @example Bun result example:
+ * {
+ *   isMainThread: true,
+ *   isNodeJS: true,
+ *   isNodeJSMainThread: true,
+ *   isBun: true,
+ *   isBunMainThread: true
+ * }
+ */
+export const isBunMainThread: boolean = ENVIRONMENT_IS_BUN
+    && !ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE
+    && ENVIRONMENT_IS_NODE_MAIN_THREAD
+;
+
+/**
+ * Is [Bun Worker]{@link https://bun.sh/docs/api/workers}.
+ *
+ * Bun implements a <u>minimal version</u> of the [`Web Worker API`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Worker/Worker}
+ * with extensions that make it work better for server-side use cases.
+ * Like the rest of Bun, Worker in Bun support CommonJS, ES Modules, TypeScript, JSX, TSX and more out of the box.
+ * No extra build steps are necessary.
+ *
+ * Bun Worker is NOT a Web-like WebWorker compatible, but more like NodeJS Workers.
+ *
+ * @see [isBun]{@link isBun}
+ * @see [isBunMainThread]{@link isBunMainThread}
+ * @see [isNodeJSWorker]{@link isNodeJSWorker}
+ *
+ * @example Deno Worker result example:
+ * {
+ *   isWorkerThread: true,
+ *   isNodeJS: true,
+ *   isNodeJSWorker: true,
+ *   isBun: true,
+ *   isBunMainThread: true,
+ *   isBunWorker: true
+ * }
+ */
+export const isBunWorker: boolean = ENVIRONMENT_IS_BUN
+    // Bun Worker is NOT a Web-like WebWorker compatible, but more like NodeJS Workers
+    && !ENVIRONMENT_IS_NODE_MAIN_THREAD
+;
 
 // -----------============================== Web details ==============================-----------
 
 /**
- * Is this code running in **WEB** environment with such global objects available:
+ * Is this code running in **WEB-like** environment with such global objects available:
  * * [`window`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window}
  * * [`document`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/document}
  * * [`navigator`]{@link https://developer.mozilla.org/en-US/docs/Web/API/Window/navigator}
@@ -534,6 +614,16 @@ export const isDenoWorkerWithImportScripts: boolean = ENVIRONMENT_IS_DENO_WORKER
  * If `true`, one of ({@link isNodeJS}, {@link isDeno}, {@link isNWJSMixedContextWindow}, {@link isElectron}, etc) may be `true`.
  */
 export const isWebMainThreadCompatible: boolean = ENVIRONMENT_IS_WEB_MAIN_PROCESS_COMPATIBLE;
+
+/**
+ * Is this code running in **WebWorker-like** environment
+
+ * In *common cases* this mean this is fully compatible **WebWorker** environment.
+ *
+ * If `true`, one of ({@link isWebWorker}, {@link isDenoWorker}, {@link isBunWorker}, etc) may be `true`.
+ */
+export const isWebWorkerThreadCompatible: boolean = ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE;
+
 /**
  * Is this code running in **WEB** environment?
  *
@@ -804,7 +894,7 @@ export const isElectronMain = ELECTRON_ENV === ELECTRON__MAIN;
  **/
 export const isElectronRenderer: boolean = ELECTRON_ENV === ELECTRON__RENDERER_WITH_NODE_INTEGRATION
     // Determine Electron Renderer process by circumstantial evidence. We assume, if it's WebWorker, it can't be a Renderer process.
-    || (ELECTRON_ENV === ELECTRON__NO_NODE_INTEGRATION && !ENVIRONMENT_IS_WEB_WORKER)
+    || (ELECTRON_ENV === ELECTRON__NO_NODE_INTEGRATION && !ENVIRONMENT_IS_WEB_WORKER_COMPATIBLE)
 ;
 
 /**
@@ -918,9 +1008,14 @@ const _envDetails = {
     isDenoWorker,
     isDenoWorkerWithImportScripts,
 
+    isBun,
+    isBunMainThread,
+    isBunWorker,
+
     isWeb,
     isWebMainThread,
     isWebMainThreadCompatible,
+    isWebWorkerThreadCompatible,
     isWebDependentWindow,
     isWebWorker,
     isWebDedicatedWorker,

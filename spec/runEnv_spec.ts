@@ -146,6 +146,33 @@ describe('runEnv', function() {
             _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
         });
 
+        it('NodeJSWorkerThead', function() {
+            jest.mock('worker_threads', () => {
+                return {
+                    isMainThread: false,
+                };
+            });
+
+            const runEnv_NodeJSWorkerThead = _runEnv_inContext(like_NodeJSMainTheadContext);
+            const { envDetails, envDetailsFull } = runEnv_NodeJSWorkerThead;
+
+            expect(runEnv_NodeJSWorkerThead.isNodeJS).toBe(true);
+            expect(runEnv_NodeJSWorkerThead.isNodeJSWorker).toBe(true);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isWorkerThread: true,
+                isNodeJS: true,
+                isNodeJSWorker: true,
+            });
+
+            // all other props should be false
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
+
+            jest.dontMock('worker_threads');
+        });
+
         it('NodeJSDependentProcess', function() {
             // eslint-disable-next-line jest/unbound-method
             const prev_value_send = process.send;
@@ -299,6 +326,71 @@ describe('runEnv', function() {
                 isWorkerThread: true,
                 isWeb: true,
                 isWebWorker: true,
+                isWebWorkerThreadCompatible: true,
+            });
+
+            // all other props should be false
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
+        });
+    });
+
+    describe('Bun process', function() {
+        const like_BunMainTheadContext = {
+            ...like_NodeJSMainTheadContext,
+            Bun: {
+                version: 'mock',
+                isMainThread: true,
+                file() {
+                    throw new Error('Unimplemented');
+                },
+                fetch() {
+                    throw new Error('Unimplemented');
+                },
+            },
+        };
+
+        it('BunMainThead', function() {
+            const runEnv_BunMainThead = _runEnv_inContext(like_BunMainTheadContext);
+            const { envDetails, envDetailsFull } = runEnv_BunMainThead;
+
+            expect(runEnv_BunMainThead.isBun).toBe(true);
+            expect(runEnv_BunMainThead.isBunMainThread).toBe(true);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isMainThread: true,
+                isNodeJS: true,
+                isNodeJSMainThread: true,
+                isBun: true,
+                isBunMainThread: true,
+            });
+
+            // all other props should be false
+            _check_runEnv_props(envDetailsFull, Object.keys(envDetailsWithTrueProps) as IEnvDetailsKeys);
+        });
+
+        it('BunWorkerThead', function() {
+            const like_BunWorkerTheadContext = {
+                ...like_BunMainTheadContext,
+            };
+
+            like_BunWorkerTheadContext.Bun.isMainThread = false;
+
+            const runEnv_BunWorkerThead = _runEnv_inContext(like_BunWorkerTheadContext);
+            const { envDetails, envDetailsFull } = runEnv_BunWorkerThead;
+
+            expect(runEnv_BunWorkerThead.isBun).toBe(true);
+            expect(runEnv_BunWorkerThead.isBunWorker).toBe(true);
+
+            let envDetailsWithTrueProps: IEnvDetails;
+
+            expect(envDetails).toEqual(envDetailsWithTrueProps = {
+                isWorkerThread: true,
+                isNodeJS: true,
+                isNodeJSWorker: true,
+                isBun: true,
+                isBunWorker: true,
             });
 
             // all other props should be false
@@ -412,8 +504,7 @@ describe('runEnv', function() {
                 isDeno: true,
                 isDenoWorker: true,
                 isDenoWorkerWithImportScripts: true,
-                isWebWorker: true,
-                isWebDedicatedWorker: true,
+                isWebWorkerThreadCompatible: true,
             });
 
             // all other props should be false
@@ -443,8 +534,7 @@ describe('runEnv', function() {
                 isWorkerThread: true,
                 isDeno: true,
                 isDenoWorker: true,
-                isWebWorker: true,
-                isWebDedicatedWorker: true,
+                isWebWorkerThreadCompatible: true,
             });
 
             // all other props should be false
