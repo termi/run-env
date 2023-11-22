@@ -8,6 +8,7 @@ const {
     stat,
     rename,
     rm,
+    copyFile,
 } = require('node:fs/promises');
 const {
     existsSync,
@@ -74,7 +75,12 @@ async function scanDirAndRenameJSFiles(dirName, newExt) {
                     await rm(newPathName);
                 }
 
-                await rename(pathName, newPathName);
+                if (fileName === 'index.js') {
+                    await copyFile(pathName, newPathName);
+                }
+                else {
+                    await rename(pathName, newPathName);
+                }
             }
         }
     });
